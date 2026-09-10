@@ -2,12 +2,10 @@ use std::fs;
 
 use eframe::egui::{self, RichText};
 
-use crate::app::{
-    HelperApp, PendingAction, confirm_pending, maybe_import_config_text, maybe_import_store_text,
-};
-use crate::config::{Accent, Density, Launcher, ThemeChoice, config_path, default_launchers};
+use crate::app::{HelperApp, PendingAction, confirm_pending, maybe_import_bundle_text};
+use crate::bundle::{HelperBundle, bundle_path};
+use crate::config::{AccentColor, Density, Launcher, ThemeChoice, default_launchers};
 use crate::launch::split_args;
-use crate::store::store_path;
 use crate::theme;
 
 impl HelperApp {
@@ -29,11 +27,8 @@ impl HelperApp {
             return;
         };
         let message = match pending {
-            PendingAction::ImportStore(_) => {
-                "Import will replace the current workspace (pins, notes, snippets, recents)."
-            }
-            PendingAction::ImportConfig(_) => {
-                "Import will replace launchers and appearance settings."
+            PendingAction::ImportBundle(_) => {
+                "Import will replace workspace and settings from this JSON file."
             }
             PendingAction::Reload => "Reload from disk and discard in-memory edits?",
         };
@@ -82,18 +77,21 @@ impl HelperApp {
             });
 
             ui.add_space(8.0);
-            ui.label(theme::muted(&p, "Accent"));
             ui.horizontal(|ui| {
-                for accent in [Accent::Teal, Accent::Blue, Accent::Amber, Accent::Rose] {
-                    let selected = self.config.appearance.accent == accent;
-                    let label = match accent {
-                        Accent::Teal => "Teal",
-                        Accent::Blue => "Blue",
-                        Accent::Amber => "Amber",
-                        Accent::Rose => "Rose",
-                    };
-                    if ui.selectable_label(selected, label).clicked() {
-                        self.config.appearance.accent = accent;
+                ui.label(theme::muted(&p, "Accent"));
+                ui.label(
+                    RichText::new(self.config.appearance.accent.to_string())
+                        .small()
+                        .monospace()
+                        .color(p.muted),
+                );
+            });
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                for swatch in AccentColor::SWATCHES {
+                    let selected = self.config.appearance.accent == swatch;
+                    if theme::color_chip(ui, &p, swatch.to_color32(), selected).clicked() {
+                        self.config.appearance.accent = swatch;
                         changed = true;
                     }
                 }
@@ -140,52 +138,33 @@ impl HelperApp {
             ui.label(RichText::new("Data").heading().color(p.text));
             ui.label(theme::muted(
                 &p,
-                "Pins, notes, snippets, recents, and settings live in the app-data folder. Import parses first and only then replaces the file.",
+                "Workspace and settings share one JSON file. Import parses first, then replaces.",
             ));
             ui.add_space(6.0);
-            ui.label(RichText::new(self.app_dir.display().to_string()).monospace());
+            ui.label(RichText::new(bundle_path(&self.app_dir).display().to_string()).monospace());
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
                 if theme::ghost_button(ui, &p, "Reload from disk").clicked() {
                     self.pending = Some(PendingAction::Reload);
                 }
-                if theme::ghost_button(ui, &p, "Export workspace").clicked()
+                if theme::ghost_button(ui, &p, "Export JSON").clicked()
                     && let Some(path) = rfd::FileDialog::new()
-                        .set_file_name("helper-store.json")
+                        .set_file_name("helper.json")
                         .save_file()
                 {
-                    match self.store.save(&path) {
+                    let bundle = HelperBundle::from_parts(self.store.clone(), self.config.clone());
+                    match bundle.save(&path) {
                         Ok(()) => self.status = format!("Exported {}", path.display()),
                         Err(err) => self.status = format!("Export failed: {err}"),
                     }
                 }
-                if theme::ghost_button(ui, &p, "Export settings").clicked()
-                    && let Some(path) = rfd::FileDialog::new()
-                        .set_file_name("helper-config.toml")
-                        .save_file()
-                {
-                    match self.config.save(&path) {
-                        Ok(()) => self.status = format!("Exported {}", path.display()),
-                        Err(err) => self.status = format!("Export failed: {err}"),
-                    }
-                }
-                if theme::ghost_button(ui, &p, "Import workspace").clicked()
+                if theme::ghost_button(ui, &p, "Import JSON").clicked()
                     && let Some(path) = rfd::FileDialog::new()
                         .add_filter("JSON", &["json"])
                         .pick_file()
                 {
                     match fs::read_to_string(&path) {
-                        Ok(text) => maybe_import_store_text(self, text),
-                        Err(err) => self.status = format!("Could not read file: {err}"),
-                    }
-                }
-                if theme::ghost_button(ui, &p, "Import settings").clicked()
-                    && let Some(path) = rfd::FileDialog::new()
-                        .add_filter("TOML", &["toml"])
-                        .pick_file()
-                {
-                    match fs::read_to_string(&path) {
-                        Ok(text) => maybe_import_config_text(self, text),
+                        Ok(text) => maybe_import_bundle_text(self, text),
                         Err(err) => self.status = format!("Could not read file: {err}"),
                     }
                 }
@@ -205,18 +184,6 @@ impl HelperApp {
                     }
                 }
             });
-            ui.add_space(4.0);
-            ui.label(
-                theme::muted(
-                    &p,
-                    format!(
-                        "Workspace file: {} · Settings file: {}",
-                        store_path(&self.app_dir).display(),
-                        config_path(&self.app_dir).display()
-                    ),
-                )
-                .small(),
-            );
         });
     }
 
@@ -278,10 +245,10 @@ impl HelperApp {
                         if ui.radio(launcher.is_default, "").clicked() {
                             set_default = Some(i);
                         }
-                        if ui.small_button("▴").clicked() {
+                        if theme::chevron_button(ui, &p, false).clicked() {
                             reorder = Some((i, false));
                         }
-                        if ui.small_button("▾").clicked() {
+                        if theme::chevron_button(ui, &p, true).clicked() {
                             reorder = Some((i, true));
                         }
                         if theme::danger_button(ui, &p, "Remove").clicked() {

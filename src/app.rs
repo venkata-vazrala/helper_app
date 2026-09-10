@@ -4,12 +4,11 @@ use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 
-use crate::config::{
-    AppConfig, Appearance, Density, Launcher, ThemeChoice, config_path, import_config,
-};
+use crate::bundle::{HelperBundle, bundle_path, import_bundle};
+use crate::config::{AppConfig, Appearance, Density, Launcher, ThemeChoice};
 use crate::launch;
 use crate::reorder::{move_down, move_up};
-use crate::store::{Store, app_dir, import_store, store_path};
+use crate::store::{Store, app_dir};
 use crate::theme::{self, Palette};
 
 pub const SAVE_DEBOUNCE: Duration = Duration::from_millis(400);
@@ -50,8 +49,7 @@ pub struct DirEntryInfo {
 }
 
 pub enum PendingAction {
-    ImportStore(Store),
-    ImportConfig(AppConfig),
+    ImportBundle(HelperBundle),
     Reload,
 }
 
@@ -80,9 +78,10 @@ pub struct HelperApp {
 impl HelperApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let app_dir = app_dir();
-        let mut config = AppConfig::load_or_default(&config_path(&app_dir));
-        config.appearance.clamp();
-        let store = Store::load_or_default(&store_path(&app_dir));
+        let mut bundle = HelperBundle::load(&app_dir);
+        bundle.settings.appearance.clamp();
+        let config = bundle.settings;
+        let store = bundle.workspace;
         let theme = resolve_theme(&cc.egui_ctx, config.appearance.theme);
         let palette = Palette::new(theme, config.appearance.accent);
         theme::apply(&cc.egui_ctx, theme, &config.appearance, &palette);
@@ -119,16 +118,19 @@ impl HelperApp {
     }
 
     pub fn persist_store(&mut self) {
-        if let Err(err) = self.store.save(&store_path(&self.app_dir)) {
-            self.status = format!("Could not save workspace: {err}");
-        } else {
-            self.store_dirty = false;
-        }
+        self.persist_bundle();
     }
 
     pub fn persist_config(&mut self) {
-        if let Err(err) = self.config.save(&config_path(&self.app_dir)) {
-            self.status = format!("Could not save settings: {err}");
+        self.persist_bundle();
+    }
+
+    fn persist_bundle(&mut self) {
+        let bundle = HelperBundle::from_parts(self.store.clone(), self.config.clone());
+        if let Err(err) = bundle.save(&bundle_path(&self.app_dir)) {
+            self.status = format!("Could not save: {err}");
+        } else {
+            self.store_dirty = false;
         }
     }
 
@@ -144,8 +146,8 @@ impl HelperApp {
     }
 
     fn persist_all(&mut self) -> std::io::Result<()> {
-        self.config.save(&config_path(&self.app_dir))?;
-        self.store.save(&store_path(&self.app_dir))?;
+        HelperBundle::from_parts(self.store.clone(), self.config.clone())
+            .save(&bundle_path(&self.app_dir))?;
         self.store_dirty = false;
         Ok(())
     }
@@ -300,9 +302,10 @@ impl HelperApp {
 
     pub fn reload_from_disk(&mut self) {
         self.flush_store();
-        self.config = AppConfig::load_or_default(&config_path(&self.app_dir));
+        let bundle = HelperBundle::load(&self.app_dir);
+        self.config = bundle.settings;
         self.config.appearance.clamp();
-        self.store = Store::load_or_default(&store_path(&self.app_dir));
+        self.store = bundle.workspace;
         self.selected_pin = self.store.pins.first().map(|p| p.id.clone());
         self.active_path = self.store.pins.first().map(|p| p.path.clone());
         self.selected_note = self.store.notes.first().map(|n| n.id.clone());
@@ -316,23 +319,18 @@ impl HelperApp {
         self.last_style = None;
     }
 
-    pub fn apply_imported_store(&mut self, store: Store) {
-        self.store = store;
-        self.persist_store();
+    pub fn apply_imported_bundle(&mut self, bundle: HelperBundle) {
+        self.store = bundle.workspace;
+        self.config = bundle.settings;
+        self.config.appearance.clamp();
+        self.persist_bundle();
         self.selected_pin = self.store.pins.first().map(|p| p.id.clone());
         self.active_path = self.store.pins.first().map(|p| p.path.clone());
         self.selected_note = self.store.notes.first().map(|n| n.id.clone());
         self.selected_snippet = self.store.snippets.first().map(|s| s.id.clone());
         self.refresh_listing();
-        self.status = "Imported workspace.".into();
-    }
-
-    pub fn apply_imported_config(&mut self, config: AppConfig) {
-        self.config = config;
-        self.config.appearance.clamp();
-        self.persist_config();
         self.invalidate_style();
-        self.status = "Imported settings.".into();
+        self.status = "Imported Helper data.".into();
     }
 
     fn sync_style(&mut self, ctx: &egui::Context) {
@@ -394,59 +392,91 @@ impl eframe::App for HelperApp {
         let p = self.palette;
 
         let chrome_h = match self.config.appearance.density {
-            Density::Compact => 58.0,
-            Density::Comfortable => 68.0,
+            Density::Compact => 48.0,
+            Density::Comfortable => 52.0,
         };
         egui::Panel::top("chrome")
             .exact_size(chrome_h)
+            .frame(
+                egui::Frame::new()
+                    .fill(p.bg)
+                    .inner_margin(egui::Margin::symmetric(16, 0)),
+            )
             .show_separator_line(false)
             .show(ui, |ui| {
-                theme::card(&p).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        let (mark, _) =
-                            ui.allocate_exact_size(Vec2::splat(28.0), egui::Sense::hover());
-                        ui.painter().rect_filled(mark, 7.0, p.accent);
-                        ui.painter().text(
-                            mark.center(),
-                            Align2::CENTER_CENTER,
-                            "H",
-                            FontId::proportional(15.0),
-                            p.on_accent,
-                        );
-                        ui.add_space(6.0);
-                        ui.vertical(|ui| {
-                            ui.add_space(1.0);
-                            ui.label(RichText::new("Helper").size(18.0).strong().color(p.text));
-                            ui.label(theme::muted(&p, "Workspace"));
-                        });
-                        ui.add_space(18.0);
-                        for tab in [Tab::Files, Tab::Notes, Tab::Snippets, Tab::Settings] {
-                            if tab_chip(ui, &p, self.tab == tab, tab) {
-                                self.switch_tab(tab);
-                            }
+                let mut selected_rect: Option<Rect> = None;
+                ui.horizontal_centered(|ui| {
+                    let (mark, _) = ui.allocate_exact_size(Vec2::splat(26.0), egui::Sense::hover());
+                    ui.painter().rect_filled(mark, 6.0, p.accent);
+                    ui.painter().text(
+                        mark.center(),
+                        Align2::CENTER_CENTER,
+                        "H",
+                        FontId::proportional(14.0),
+                        p.on_accent,
+                    );
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Helper").size(16.0).strong().color(p.text));
+                    ui.add_space(22.0);
+                    ui.spacing_mut().item_spacing.x = 2.0;
+                    let mut clicked_tab = None;
+                    for tab in [Tab::Files, Tab::Notes, Tab::Snippets, Tab::Settings] {
+                        let selected = self.tab == tab;
+                        let (rect, clicked) = tab_chip(ui, &p, selected, tab);
+                        if selected {
+                            selected_rect = Some(rect);
                         }
-                    });
+                        if clicked {
+                            clicked_tab = Some(tab);
+                        }
+                    }
+                    if let Some(tab) = clicked_tab {
+                        self.switch_tab(tab);
+                    }
                 });
+                let bar = ui.max_rect();
+                let y = bar.bottom() - 1.0;
+                let line = Stroke::new(1.0, p.border);
+                if let Some(sel) = selected_rect {
+                    if sel.left() > bar.left() {
+                        ui.painter().hline(bar.left()..=sel.left() + 1.0, y, line);
+                    }
+                    if sel.right() < bar.right() {
+                        ui.painter().hline(sel.right() - 1.0..=bar.right(), y, line);
+                    }
+                } else {
+                    ui.painter().hline(bar.x_range(), y, line);
+                }
             });
 
         egui::Panel::bottom("status")
-            .exact_size(36.0)
+            .exact_size(32.0)
+            .frame(
+                egui::Frame::new()
+                    .fill(p.bg)
+                    .inner_margin(egui::Margin::symmetric(16, 6)),
+            )
             .show_separator_line(false)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.add_space(6.0);
                     let (dot, _) = ui.allocate_exact_size(Vec2::splat(8.0), egui::Sense::hover());
                     ui.painter().circle_filled(dot.center(), 3.5, p.accent);
                     ui.label(RichText::new(&self.status).color(p.muted).size(13.0));
                 });
             });
 
-        egui::CentralPanel::default().show(ui, |ui| match self.tab {
-            Tab::Files => self.ui_files(ui),
-            Tab::Notes => self.ui_notes(ui),
-            Tab::Snippets => self.ui_snippets(ui),
-            Tab::Settings => self.ui_settings(ui),
-        });
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(p.surface)
+                    .inner_margin(egui::Margin::symmetric(14, 12)),
+            )
+            .show(ui, |ui| match self.tab {
+                Tab::Files => self.ui_files(ui),
+                Tab::Notes => self.ui_notes(ui),
+                Tab::Snippets => self.ui_snippets(ui),
+                Tab::Settings => self.ui_settings(ui),
+            });
     }
 }
 
@@ -458,46 +488,53 @@ fn resolve_theme(ctx: &egui::Context, choice: ThemeChoice) -> egui::Theme {
     }
 }
 
-fn tab_chip(ui: &mut egui::Ui, p: &Palette, selected: bool, tab: Tab) -> bool {
-    let size = Vec2::new(112.0, 36.0);
-    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+fn tab_chip(ui: &mut egui::Ui, p: &Palette, selected: bool, tab: Tab) -> (Rect, bool) {
+    let size = Vec2::new(108.0, 36.0);
+    let (id_rect, response) = ui.allocate_exact_size(size, Sense::click());
+    // Hang 1px over the chrome/content join so the selected tab is one plane with the window.
+    let rect = if selected {
+        Rect::from_min_max(id_rect.min, Pos2::new(id_rect.max.x, id_rect.max.y + 1.0))
+    } else {
+        id_rect
+    };
     let hovered = response.hovered();
     let fill = if selected {
-        p.accent_dim
+        p.surface
     } else if hovered {
         p.surface_2
     } else {
         Color32::TRANSPARENT
     };
-    let stroke = if selected {
-        Stroke::new(1.0, p.accent)
-    } else {
-        Stroke::new(1.0, Color32::TRANSPARENT)
+    let rounding = egui::CornerRadius {
+        nw: 8,
+        ne: 8,
+        sw: 0,
+        se: 0,
     };
     ui.painter()
-        .rect(rect, 8.0, fill, stroke, egui::StrokeKind::Inside);
+        .rect(rect, rounding, fill, Stroke::NONE, egui::StrokeKind::Inside);
     if selected {
-        let bar = Rect::from_min_max(
-            Pos2::new(rect.left() + 10.0, rect.bottom() - 3.0),
-            Pos2::new(rect.right() - 10.0, rect.bottom() - 1.0),
+        let cap = Rect::from_min_max(
+            Pos2::new(rect.left() + 12.0, rect.top() + 4.0),
+            Pos2::new(rect.right() - 12.0, rect.top() + 6.0),
         );
-        ui.painter().rect_filled(bar, 1.0, p.accent);
+        ui.painter().rect_filled(cap, 1.0, p.accent);
     }
     ui.painter().text(
-        Pos2::new(rect.left() + 12.0, rect.center().y),
+        Pos2::new(rect.left() + 12.0, rect.center().y + 1.0),
         Align2::LEFT_CENTER,
         tab.label(),
-        FontId::proportional(14.5),
+        FontId::proportional(14.0),
         if selected { p.text } else { p.muted },
     );
     ui.painter().text(
-        Pos2::new(rect.right() - 6.0, rect.top() + 5.0),
+        Pos2::new(rect.right() - 7.0, rect.top() + 6.0),
         Align2::RIGHT_TOP,
         tab.shortcut(),
-        FontId::proportional(10.0),
+        FontId::proportional(9.5),
         p.muted,
     );
-    response.clicked()
+    (id_rect, response.clicked())
 }
 
 pub fn open_with_row(ui: &mut egui::Ui, app: &mut HelperApp) {
@@ -524,21 +561,11 @@ pub fn open_with_row(ui: &mut egui::Ui, app: &mut HelperApp) {
     });
 }
 
-pub fn maybe_import_store_text(app: &mut HelperApp, text: String) {
-    match Store::parse_json(&text) {
-        Ok(store) => {
-            app.pending = Some(PendingAction::ImportStore(store));
+pub fn maybe_import_bundle_text(app: &mut HelperApp, text: String) {
+    match HelperBundle::parse_json(&text) {
+        Ok(bundle) => {
+            app.pending = Some(PendingAction::ImportBundle(bundle));
             app.status = "Import ready — confirm replace in Settings.".into();
-        }
-        Err(err) => app.status = format!("Import rejected: {err}"),
-    }
-}
-
-pub fn maybe_import_config_text(app: &mut HelperApp, text: String) {
-    match AppConfig::parse_toml(&text) {
-        Ok(cfg) => {
-            app.pending = Some(PendingAction::ImportConfig(cfg));
-            app.status = "Settings import ready — confirm replace.".into();
         }
         Err(err) => app.status = format!("Import rejected: {err}"),
     }
@@ -546,16 +573,9 @@ pub fn maybe_import_config_text(app: &mut HelperApp, text: String) {
 
 pub fn confirm_pending(app: &mut HelperApp) {
     match app.pending.take() {
-        Some(PendingAction::ImportStore(store)) => match serde_json::to_string(&store) {
-            Ok(text) => match import_store(&store_path(&app.app_dir), &text) {
-                Ok(saved) => app.apply_imported_store(saved),
-                Err(err) => app.status = format!("Import failed: {err}"),
-            },
-            Err(err) => app.status = format!("Import failed: {err}"),
-        },
-        Some(PendingAction::ImportConfig(cfg)) => match toml::to_string(&cfg) {
-            Ok(text) => match import_config(&config_path(&app.app_dir), &text) {
-                Ok(saved) => app.apply_imported_config(saved),
+        Some(PendingAction::ImportBundle(bundle)) => match serde_json::to_string(&bundle) {
+            Ok(text) => match import_bundle(&bundle_path(&app.app_dir), &text) {
+                Ok(saved) => app.apply_imported_bundle(saved),
                 Err(err) => app.status = format!("Import failed: {err}"),
             },
             Err(err) => app.status = format!("Import failed: {err}"),

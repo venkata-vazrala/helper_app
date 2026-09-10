@@ -49,9 +49,10 @@ open -a Helper
 
 User data is **not** in this repo. It lives in the OS app-data directory:
 
-- macOS: `~/Library/Application Support/helper-app/`
-  - `config.toml` — launchers
-  - `store.json` — pins, notes, snippets
+- macOS: `~/Library/Application Support/helper-app/helper.json`
+  - one JSON file for workspace (pins, notes, snippets, recents) **and** settings (launchers, appearance)
+
+Older `store.json` / `config.toml` files are migrated into `helper.json` on first launch.
 
 See `config.example.toml` for the launcher format. Placeholders:
 

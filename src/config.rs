@@ -1,11 +1,13 @@
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    #[serde(default = "default_launchers")]
     pub launchers: Vec<Launcher>,
     #[serde(default)]
     pub appearance: Appearance,
@@ -29,14 +31,94 @@ pub enum ThemeChoice {
     System,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum Accent {
-    #[default]
-    Teal,
-    Blue,
-    Amber,
-    Rose,
+/// Stored as `#RRGGBB`. Old names (`teal`, `blue`, …) still parse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AccentColor {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+impl AccentColor {
+    pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
+        Self { r, g, b }
+    }
+
+    pub const TEAL: Self = Self::rgb(62, 176, 162);
+    pub const BLUE: Self = Self::rgb(64, 140, 220);
+    pub const SKY: Self = Self::rgb(56, 189, 248);
+    pub const INDIGO: Self = Self::rgb(99, 102, 241);
+    pub const VIOLET: Self = Self::rgb(167, 139, 250);
+    pub const ROSE: Self = Self::rgb(244, 114, 182);
+    pub const RED: Self = Self::rgb(239, 68, 68);
+    pub const ORANGE: Self = Self::rgb(249, 115, 22);
+    pub const AMBER: Self = Self::rgb(245, 158, 11);
+    pub const LIME: Self = Self::rgb(132, 204, 22);
+    pub const GREEN: Self = Self::rgb(34, 197, 94);
+    pub const MINT: Self = Self::rgb(45, 212, 191);
+
+    pub const SWATCHES: [Self; 12] = [
+        Self::TEAL,
+        Self::MINT,
+        Self::GREEN,
+        Self::LIME,
+        Self::SKY,
+        Self::BLUE,
+        Self::INDIGO,
+        Self::VIOLET,
+        Self::ROSE,
+        Self::RED,
+        Self::ORANGE,
+        Self::AMBER,
+    ];
+
+    pub fn to_color32(self) -> eframe::egui::Color32 {
+        eframe::egui::Color32::from_rgb(self.r, self.g, self.b)
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        let s = s.trim();
+        match s.to_ascii_lowercase().as_str() {
+            "teal" => Some(Self::TEAL),
+            "blue" => Some(Self::BLUE),
+            "amber" => Some(Self::AMBER),
+            "rose" => Some(Self::ROSE),
+            "green" => Some(Self::GREEN),
+            "mint" => Some(Self::MINT),
+            other if other.starts_with('#') && other.len() == 7 => {
+                let r = u8::from_str_radix(&other[1..3], 16).ok()?;
+                let g = u8::from_str_radix(&other[3..5], 16).ok()?;
+                let b = u8::from_str_radix(&other[5..7], 16).ok()?;
+                Some(Self::rgb(r, g, b))
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Default for AccentColor {
+    fn default() -> Self {
+        Self::TEAL
+    }
+}
+
+impl fmt::Display for AccentColor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "#{:02X}{:02X}{:02X}", self.r, self.g, self.b)
+    }
+}
+
+impl Serialize for AccentColor {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for AccentColor {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Self::parse(&s).ok_or_else(|| serde::de::Error::custom(format!("invalid accent {s}")))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -52,7 +134,7 @@ pub struct Appearance {
     #[serde(default)]
     pub theme: ThemeChoice,
     #[serde(default)]
-    pub accent: Accent,
+    pub accent: AccentColor,
     #[serde(default)]
     pub density: Density,
     #[serde(default = "default_font_scale")]
@@ -63,7 +145,7 @@ impl Default for Appearance {
     fn default() -> Self {
         Self {
             theme: ThemeChoice::Dark,
-            accent: Accent::Teal,
+            accent: AccentColor::TEAL,
             density: Density::Comfortable,
             font_scale: 1.0,
         }
@@ -219,7 +301,7 @@ command = "open"
 args = ["{path}"]
 "#;
         let cfg = AppConfig::parse_toml(text).unwrap();
-        assert_eq!(cfg.appearance.accent, Accent::Teal);
+        assert_eq!(cfg.appearance.accent, AccentColor::TEAL);
         assert_eq!(cfg.launchers.len(), 1);
     }
 
@@ -233,5 +315,14 @@ args = ["{path}"]
         let err = import_config(&dest, "not = toml [[[").unwrap_err();
         assert!(!err.is_empty());
         assert_eq!(fs::read_to_string(&dest).unwrap(), before);
+    }
+
+    #[test]
+    fn accent_parses_hex_and_legacy_names() {
+        assert_eq!(AccentColor::parse("#3EB0A2"), Some(AccentColor::TEAL));
+        assert_eq!(AccentColor::parse("teal"), Some(AccentColor::TEAL));
+        assert_eq!(AccentColor::parse("rose"), Some(AccentColor::ROSE));
+        assert!(AccentColor::parse("nope").is_none());
+        assert_eq!(AccentColor::TEAL.to_string(), "#3EB0A2");
     }
 }

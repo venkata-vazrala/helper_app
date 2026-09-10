@@ -22,6 +22,10 @@
 | Debounced save (400ms, flush on tab/close) | done |
 | Verify (`cargo test` 24 passed, clippy `-D warnings`, fmt) | done |
 | Snippets editor: always-on scrollbars + list preview | done |
+| Single `helper.json` for workspace + settings | done |
+| Painted chevron reorder buttons | done |
+| Accent color chips (12 swatches) | done |
+| Tab bar flush with content (folder-tab join) | done |
 
 ## How to check it
 

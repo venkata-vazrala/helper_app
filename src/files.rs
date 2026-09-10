@@ -40,10 +40,10 @@ impl HelperApp {
                     self.persist_store();
                     self.status = "Moved to Recents.".into();
                 }
-                if theme::ghost_button(ui, &p, "▴").clicked() {
+                if theme::chevron_button(ui, &p, false).clicked() {
                     self.reorder_selected(false);
                 }
-                if theme::ghost_button(ui, &p, "▾").clicked() {
+                if theme::chevron_button(ui, &p, true).clicked() {
                     self.reorder_selected(true);
                 }
                 ui.separator();

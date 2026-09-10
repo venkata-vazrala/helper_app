@@ -2,7 +2,7 @@ use eframe::egui::{
     self, Color32, CornerRadius, FontId, Frame, Margin, RichText, Stroke, TextStyle, Theme, Vec2,
 };
 
-use crate::config::{Accent, Appearance, Density};
+use crate::config::{AccentColor, Appearance, Density};
 
 #[derive(Clone, Copy)]
 pub struct Palette {
@@ -21,20 +21,14 @@ pub struct Palette {
     pub on_accent: Color32,
 }
 
-impl Accent {
-    pub fn color(self) -> Color32 {
-        match self {
-            Accent::Teal => Color32::from_rgb(62, 176, 162),
-            Accent::Blue => Color32::from_rgb(64, 140, 220),
-            Accent::Amber => Color32::from_rgb(214, 164, 88),
-            Accent::Rose => Color32::from_rgb(196, 90, 120),
-        }
-    }
-}
-
 impl Palette {
-    pub fn new(theme: Theme, accent: Accent) -> Self {
-        let accent_c = accent.color();
+    pub fn new(theme: Theme, accent: AccentColor) -> Self {
+        let accent_c = accent.to_color32();
+        let on_accent = if luminance(accent_c) > 0.55 {
+            Color32::from_rgb(16, 22, 20)
+        } else {
+            Color32::from_rgb(248, 250, 252)
+        };
         match theme {
             Theme::Dark => Self {
                 bg: Color32::from_rgb(16, 18, 21),
@@ -49,7 +43,7 @@ impl Palette {
                 muted: Color32::from_rgb(148, 160, 170),
                 danger: Color32::from_rgb(196, 84, 84),
                 warn: Color32::from_rgb(214, 164, 88),
-                on_accent: Color32::from_rgb(12, 24, 22),
+                on_accent,
             },
             Theme::Light => Self {
                 bg: Color32::from_rgb(236, 238, 241),
@@ -64,7 +58,7 @@ impl Palette {
                 muted: Color32::from_rgb(90, 100, 110),
                 danger: Color32::from_rgb(176, 56, 56),
                 warn: Color32::from_rgb(170, 120, 32),
-                on_accent: Color32::from_rgb(12, 24, 22),
+                on_accent,
             },
         }
     }
@@ -226,6 +220,54 @@ pub fn danger_button(ui: &mut egui::Ui, p: &Palette, label: &str) -> egui::Respo
     )
 }
 
+pub fn chevron_button(ui: &mut egui::Ui, p: &Palette, down: bool) -> egui::Response {
+    let size = Vec2::splat(28.0);
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+    let hovered = response.hovered();
+    let fill = if hovered { p.accent_soft } else { p.surface_2 };
+    let stroke = Stroke::new(1.0, if hovered { p.accent } else { p.border });
+    ui.painter()
+        .rect(rect, 7.0, fill, stroke, egui::StrokeKind::Inside);
+    let c = rect.center();
+    let (a, b, d) = if down {
+        (
+            egui::pos2(c.x, c.y + 5.0),
+            egui::pos2(c.x - 6.0, c.y - 3.0),
+            egui::pos2(c.x + 6.0, c.y - 3.0),
+        )
+    } else {
+        (
+            egui::pos2(c.x, c.y - 5.0),
+            egui::pos2(c.x - 6.0, c.y + 3.0),
+            egui::pos2(c.x + 6.0, c.y + 3.0),
+        )
+    };
+    ui.painter().add(egui::Shape::convex_polygon(
+        vec![a, b, d],
+        p.text,
+        Stroke::NONE,
+    ));
+    response.on_hover_text(if down { "Move down" } else { "Move up" })
+}
+
+pub fn color_chip(
+    ui: &mut egui::Ui,
+    p: &Palette,
+    color: Color32,
+    selected: bool,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(26.0), egui::Sense::click());
+    ui.painter().circle_filled(rect.center(), 10.0, color);
+    if selected {
+        ui.painter()
+            .circle_stroke(rect.center(), 12.0, Stroke::new(2.0, p.text));
+    } else if response.hovered() {
+        ui.painter()
+            .circle_stroke(rect.center(), 12.0, Stroke::new(1.0, p.muted));
+    }
+    response
+}
+
 pub fn ghost_button(ui: &mut egui::Ui, p: &Palette, label: &str) -> egui::Response {
     ui.add(
         egui::Button::new(RichText::new(label).color(p.text))
@@ -279,13 +321,13 @@ mod tests {
 
     #[test]
     fn dark_text_is_lighter_than_background() {
-        let p = Palette::new(Theme::Dark, Accent::Teal);
+        let p = Palette::new(Theme::Dark, AccentColor::TEAL);
         assert!(luminance(p.text) > luminance(p.bg));
     }
 
     #[test]
     fn light_text_is_darker_than_background() {
-        let p = Palette::new(Theme::Light, Accent::Teal);
+        let p = Palette::new(Theme::Light, AccentColor::TEAL);
         assert!(luminance(p.text) < luminance(p.bg));
     }
 }
