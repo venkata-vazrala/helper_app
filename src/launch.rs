@@ -45,7 +45,7 @@ pub fn open_with(launcher: &Launcher, path: &Path) -> io::Result<()> {
 }
 
 /// GUI .app launches have a thin PATH. Keep Homebrew, Cargo, and Grok visible.
-fn enriched_path() -> OsString {
+pub fn enriched_path() -> OsString {
     let mut parts: Vec<String> = Vec::new();
     if let Some(home) = dirs::home_dir() {
         parts.push(home.join(".grok/bin").display().to_string());
@@ -126,5 +126,13 @@ mod tests {
     fn split_args_respects_quotes() {
         let args = split_args(r#"-a "Visual Studio Code" {path}"#);
         assert_eq!(args, vec!["-a", "Visual Studio Code", "{path}"]);
+    }
+
+    #[test]
+    fn enriched_path_includes_homebrew_and_grok() {
+        let path = enriched_path();
+        let s = path.to_string_lossy();
+        assert!(s.contains("/opt/homebrew/bin"));
+        assert!(s.contains(".grok/bin") || s.contains("/usr/bin"));
     }
 }

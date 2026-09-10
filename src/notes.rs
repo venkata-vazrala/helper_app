@@ -6,15 +6,16 @@ use crate::theme;
 
 impl HelperApp {
     pub fn ui_notes(&mut self, ui: &mut egui::Ui) {
-        theme::toolbar().show(ui, |ui| {
+        let p = self.palette;
+        theme::toolbar(&p).show(ui, |ui| {
             ui.horizontal(|ui| {
-                if theme::primary_button(ui, "New note").clicked() {
+                if theme::primary_button(ui, &p, "New note").clicked() {
                     let id = self.store.add_note();
                     self.selected_note = Some(id);
                     self.persist_store();
                     self.status = "Note created.".into();
                 }
-                if theme::danger_button(ui, "Delete note").clicked()
+                if theme::danger_button(ui, &p, "Delete note").clicked()
                     && let Some(id) = self.selected_note.clone()
                 {
                     self.store.notes.retain(|n| n.id != id);
@@ -22,8 +23,14 @@ impl HelperApp {
                     self.persist_store();
                     self.status = "Note deleted.".into();
                 }
+                if theme::ghost_button(ui, &p, "▴").clicked() {
+                    self.reorder_selected(false);
+                }
+                if theme::ghost_button(ui, &p, "▾").clicked() {
+                    self.reorder_selected(true);
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    theme::search_field(ui, &mut self.note_filter, "Search notes", 240.0);
+                    theme::search_field(ui, &p, &mut self.note_filter, "Search notes", 240.0);
                 });
             });
         });
@@ -35,16 +42,17 @@ impl HelperApp {
             .default_size(280.0)
             .show_separator_line(false)
             .show(ui, |ui| {
-                theme::card().show(ui, |ui| {
+                theme::card(&p).show(ui, |ui| {
                     theme::section_label(
                         ui,
+                        &p,
                         "Collection",
                         &format!("{} notes", self.store.notes.len()),
                     );
                     ui.add_space(8.0);
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         if self.store.notes.is_empty() {
-                            ui.label(theme::muted("No notes yet."));
+                            ui.label(theme::muted(&p, "No notes yet."));
                             return;
                         }
                         let mut clicked = None;
@@ -62,29 +70,19 @@ impl HelperApp {
                                 .chars()
                                 .take(48)
                                 .collect();
-                            let fill = if selected {
-                                theme::ACCENT_SOFT
-                            } else {
-                                theme::SURFACE_2
-                            };
+                            let fill = if selected { p.accent_soft } else { p.surface_2 };
                             let inner = egui::Frame::new()
                                 .fill(fill)
                                 .stroke(egui::Stroke::new(
                                     1.0,
-                                    if selected {
-                                        theme::ACCENT
-                                    } else {
-                                        theme::BORDER
-                                    },
+                                    if selected { p.accent } else { p.border },
                                 ))
                                 .corner_radius(8)
                                 .inner_margin(egui::Margin::symmetric(10, 8))
                                 .show(ui, |ui| {
                                     ui.set_width(ui.available_width());
-                                    ui.label(
-                                        RichText::new(&note.title).strong().color(theme::TEXT),
-                                    );
-                                    ui.label(RichText::new(preview).small().color(theme::MUTED));
+                                    ui.label(RichText::new(&note.title).strong().color(p.text));
+                                    ui.label(RichText::new(preview).small().color(p.muted));
                                 });
                             if inner.response.interact(Sense::click()).clicked() {
                                 clicked = Some(note.id.clone());
@@ -102,6 +100,7 @@ impl HelperApp {
             let Some(id) = self.selected_note.clone() else {
                 theme::empty_state(
                     ui,
+                    &p,
                     "No note open",
                     "Create a note and it stays on this machine.",
                 );
@@ -112,9 +111,9 @@ impl HelperApp {
             };
 
             let mut dirty = false;
-            theme::card().show(ui, |ui| {
+            theme::card(&p).show(ui, |ui| {
                 let note = &mut self.store.notes[index];
-                ui.label(theme::muted("Title"));
+                ui.label(theme::muted(&p, "Title"));
                 if ui
                     .add(
                         egui::TextEdit::singleline(&mut note.title)
@@ -126,8 +125,8 @@ impl HelperApp {
                     dirty = true;
                 }
                 ui.add_space(10.0);
-                ui.label(theme::muted("Body"));
-                theme::inset().show(ui, |ui| {
+                ui.label(theme::muted(&p, "Body"));
+                theme::inset(&p).show(ui, |ui| {
                     let editor = egui::TextEdit::multiline(&mut note.body)
                         .desired_width(f32::INFINITY)
                         .desired_rows(22)
@@ -139,7 +138,7 @@ impl HelperApp {
             });
             if dirty {
                 self.store.notes[index].updated_unix = now_unix();
-                self.persist_store();
+                self.mark_store_dirty();
             }
         });
     }

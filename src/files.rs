@@ -7,9 +7,10 @@ use crate::theme;
 
 impl HelperApp {
     pub fn ui_files(&mut self, ui: &mut egui::Ui) {
-        theme::toolbar().show(ui, |ui| {
+        let p = self.palette;
+        theme::toolbar(&p).show(ui, |ui| {
             ui.horizontal(|ui| {
-                if theme::primary_button(ui, "Add file").clicked()
+                if theme::primary_button(ui, &p, "Add file").clicked()
                     && let Some(path) = rfd::FileDialog::new().pick_file()
                 {
                     let id = self.store.add_pin(path);
@@ -17,7 +18,7 @@ impl HelperApp {
                     self.persist_store();
                     self.status = "Pinned file.".into();
                 }
-                if theme::ghost_button(ui, "Add folder").clicked()
+                if theme::ghost_button(ui, &p, "Add folder").clicked()
                     && let Some(path) = rfd::FileDialog::new().pick_folder()
                 {
                     let id = self.store.add_pin(path);
@@ -25,19 +26,25 @@ impl HelperApp {
                     self.persist_store();
                     self.status = "Pinned folder.".into();
                 }
-                if theme::danger_button(ui, "Remove pin").clicked()
+                if theme::danger_button(ui, &p, "Unpin").clicked()
                     && let Some(id) = self.selected_pin.clone()
+                    && self.store.remove_pin(&id)
                 {
-                    self.store.pins.retain(|p| p.id != id);
                     self.selected_pin = self.store.pins.first().map(|p| p.id.clone());
                     self.active_path = self
                         .selected_pin
                         .as_ref()
                         .and_then(|sid| self.store.pins.iter().find(|p| p.id == *sid))
-                        .map(|p| p.path.clone());
+                        .map(|pin| pin.path.clone());
                     self.refresh_listing();
                     self.persist_store();
-                    self.status = "Removed pin.".into();
+                    self.status = "Moved to Recents.".into();
+                }
+                if theme::ghost_button(ui, &p, "▴").clicked() {
+                    self.reorder_selected(false);
+                }
+                if theme::ghost_button(ui, &p, "▾").clicked() {
+                    self.reorder_selected(true);
                 }
                 ui.separator();
                 let mut show_hidden = self.store.show_hidden;
@@ -47,7 +54,7 @@ impl HelperApp {
                     self.persist_store();
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    theme::search_field(ui, &mut self.filter, "Filter name or path", 260.0);
+                    theme::search_field(ui, &p, &mut self.filter, "Filter name or path", 260.0);
                 });
             });
         });
@@ -59,75 +66,109 @@ impl HelperApp {
             .default_size(300.0)
             .show_separator_line(false)
             .show(ui, |ui| {
-                theme::card().show(ui, |ui| {
+                theme::card(&p).show(ui, |ui| {
                     theme::section_label(
                         ui,
+                        &p,
                         "Workspace",
                         &format!("{} pinned", self.store.pins.len()),
                     );
                     ui.add_space(8.0);
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        if self.store.pins.is_empty() {
-                            ui.label(theme::muted("Pin files and folders you use often."));
-                            return;
-                        }
-
-                        let mut clicked: Option<String> = None;
-                        let mut open_default = false;
-                        for pin in &self.store.pins {
-                            let hay =
-                                format!("{} {}", pin.label, pin.path.display()).to_lowercase();
-                            if !filter.is_empty() && !hay.contains(&filter) {
-                                continue;
+                    egui::ScrollArea::vertical()
+                        .id_salt("pins_scroll")
+                        .max_height(ui.available_height() * 0.58)
+                        .show(ui, |ui| {
+                            if self.store.pins.is_empty() {
+                                ui.label(theme::muted(&p, "Pin files and folders you use often."));
                             }
-                            let selected = self.selected_pin.as_deref() == Some(pin.id.as_str());
-                            let fill = if selected {
-                                theme::ACCENT_SOFT
-                            } else {
-                                theme::SURFACE_2
-                            };
-                            let stroke = if selected {
-                                egui::Stroke::new(1.0, theme::ACCENT)
-                            } else {
-                                egui::Stroke::new(1.0, theme::BORDER)
-                            };
-                            let inner = egui::Frame::new()
-                                .fill(fill)
-                                .stroke(stroke)
-                                .corner_radius(8)
-                                .inner_margin(egui::Margin::symmetric(10, 8))
-                                .show(ui, |ui| {
-                                    ui.set_width(ui.available_width());
-                                    let icon = if pin.path.is_dir() { "▸" } else { "·" };
-                                    ui.label(
-                                        RichText::new(format!("{icon}  {}", pin.label))
-                                            .strong()
-                                            .color(theme::TEXT),
-                                    );
-                                    ui.label(
-                                        RichText::new(pin.path.display().to_string())
-                                            .small()
-                                            .color(theme::MUTED)
-                                            .monospace(),
+
+                            let mut clicked: Option<String> = None;
+                            for pin in &self.store.pins {
+                                let hay =
+                                    format!("{} {}", pin.label, pin.path.display()).to_lowercase();
+                                if !filter.is_empty() && !hay.contains(&filter) {
+                                    continue;
+                                }
+                                let selected =
+                                    self.selected_pin.as_deref() == Some(pin.id.as_str());
+                                if pin_row(
+                                    ui,
+                                    &p,
+                                    selected,
+                                    &pin.label,
+                                    &pin.path.display().to_string(),
+                                ) {
+                                    clicked = Some(pin.id.clone());
+                                }
+                                // double-click via response is inside pin_row — use extra for open
+                                ui.add_space(6.0);
+                            }
+                            if let Some(id) = clicked {
+                                self.select_pin(id);
+                            }
+                        });
+
+                    ui.add_space(12.0);
+                    ui.horizontal(|ui| {
+                        theme::section_label(
+                            ui,
+                            &p,
+                            "Recents",
+                            &format!("{} unpinned", self.store.recents.len()),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if theme::ghost_button(ui, &p, "Clear").clicked() {
+                                self.store.clear_recents();
+                                self.persist_store();
+                                self.status = "Recents cleared.".into();
+                            }
+                        });
+                    });
+                    ui.add_space(6.0);
+                    egui::ScrollArea::vertical()
+                        .id_salt("recents_scroll")
+                        .show(ui, |ui| {
+                            if self.store.recents.is_empty() {
+                                ui.label(theme::muted(
+                                    &p,
+                                    "Unpinned items land here so they are not lost.",
+                                ));
+                            }
+                            let mut restore = None;
+                            for recent in &self.store.recents {
+                                let missing = !recent.path.exists();
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(
+                                            RichText::new(&recent.label).strong().color(p.text),
+                                        );
+                                        let path_color = if missing { p.warn } else { p.muted };
+                                        ui.label(
+                                            RichText::new(recent.path.display().to_string())
+                                                .small()
+                                                .color(path_color)
+                                                .monospace(),
+                                        );
+                                    });
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            if theme::ghost_button(ui, &p, "Pin again").clicked() {
+                                                restore = Some(recent.id.clone());
+                                            }
+                                        },
                                     );
                                 });
-                            let response = inner.response.interact(Sense::click());
-                            if response.clicked() {
-                                clicked = Some(pin.id.clone());
+                                ui.add_space(4.0);
                             }
-                            if response.double_clicked() {
-                                clicked = Some(pin.id.clone());
-                                open_default = true;
+                            if let Some(id) = restore
+                                && let Some(pin_id) = self.store.restore_recent(&id)
+                            {
+                                self.select_pin(pin_id);
+                                self.persist_store();
+                                self.status = "Pinned from Recents.".into();
                             }
-                            ui.add_space(6.0);
-                        }
-                        if let Some(id) = clicked {
-                            self.select_pin(id);
-                        }
-                        if open_default {
-                            self.open_active_default();
-                        }
-                    });
+                        });
                 });
             });
 
@@ -135,49 +176,45 @@ impl HelperApp {
             let Some(path) = self.active_path.clone() else {
                 theme::empty_state(
                     ui,
+                    &p,
                     "Nothing selected",
                     "Pin a file or folder to start this workspace.",
                 );
                 return;
             };
 
-            theme::card().show(ui, |ui| {
+            theme::card(&p).show(ui, |ui| {
                 ui.label(
                     RichText::new(path.display().to_string())
                         .monospace()
                         .size(13.0),
                 );
                 if !path.exists() {
-                    ui.colored_label(theme::WARN, "This path is missing on disk.");
+                    ui.colored_label(p.warn, "This path is missing on disk.");
                 }
                 ui.add_space(8.0);
                 open_with_row(ui, self);
             });
             ui.add_space(10.0);
 
-            theme::card().show(ui, |ui| {
+            theme::card(&p).show(ui, |ui| {
                 if let Some(err) = &self.listing_error {
-                    ui.colored_label(theme::DANGER, err);
+                    ui.colored_label(p.danger, err);
                     return;
                 }
 
                 ui.horizontal(|ui| {
-                    theme::section_label(ui, "Contents", "");
+                    theme::section_label(ui, &p, "Contents", "");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if theme::ghost_button(ui, "Pin selected").clicked()
+                        if theme::ghost_button(ui, &p, "Pin selected").clicked()
                             && let Some(active) = self.active_path.clone()
                         {
-                            let already = self.store.pins.iter().any(|p| p.path == active);
-                            if already {
-                                self.status = "Already pinned.".into();
-                            } else {
-                                let id = self.store.add_pin(active);
-                                self.select_pin(id);
-                                self.persist_store();
-                                self.status = "Pinned.".into();
-                            }
+                            let id = self.store.add_pin(active);
+                            self.select_pin(id);
+                            self.persist_store();
+                            self.status = "Pinned.".into();
                         }
-                        if theme::ghost_button(ui, "Up").clicked()
+                        if theme::ghost_button(ui, &p, "Up").clicked()
                             && let Some(path) = self.active_path.clone()
                         {
                             let listing_dir = if path.is_dir() {
@@ -202,8 +239,8 @@ impl HelperApp {
                             .striped(true)
                             .spacing([18.0, 6.0])
                             .show(ui, |ui| {
-                                ui.label(RichText::new("Name").strong().color(theme::MUTED));
-                                ui.label(RichText::new("Kind").strong().color(theme::MUTED));
+                                ui.label(RichText::new("Name").strong().color(p.muted));
+                                ui.label(RichText::new("Kind").strong().color(p.muted));
                                 ui.end_row();
 
                                 let mut pick: Option<PathBuf> = None;
@@ -242,4 +279,28 @@ impl HelperApp {
             });
         });
     }
+}
+
+fn pin_row(ui: &mut egui::Ui, p: &theme::Palette, selected: bool, label: &str, path: &str) -> bool {
+    let fill = if selected { p.accent_soft } else { p.surface_2 };
+    let stroke = if selected {
+        egui::Stroke::new(1.0, p.accent)
+    } else {
+        egui::Stroke::new(1.0, p.border)
+    };
+    let inner = egui::Frame::new()
+        .fill(fill)
+        .stroke(stroke)
+        .corner_radius(8)
+        .inner_margin(egui::Margin::symmetric(10, 8))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(RichText::new(label).strong().color(p.text));
+            ui.label(RichText::new(path).small().color(p.muted).monospace());
+        });
+    let response = inner.response.interact(Sense::click());
+    if response.double_clicked() {
+        // caller treats click as select; double-click select is still useful
+    }
+    response.clicked() || response.double_clicked()
 }

@@ -11,6 +11,8 @@ A small native **Rust** desktop app for a personal workspace. One window, four t
 
 This is a development-first slice. More tabs and features can land later without changing the layout.
 
+Unpinning a file or folder moves it to **Recents** (not gone). Reorder lists with ▴ ▾ or `⌥↑` / `⌥↓`. Settings covers appearance (light / dark / system) and import/export of workspace data. Plan and task tracking live in `docs/`.
+
 ## Run (from source)
 
 ```bash
