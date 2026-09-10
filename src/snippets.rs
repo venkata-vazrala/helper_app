@@ -62,7 +62,7 @@ impl HelperApp {
                                 return;
                             }
                             let mut clicked = None;
-                            let mut copy_id = None;
+                            let mut copied: Option<(String, bool)> = None;
                             for snippet in &self.store.snippets {
                                 let hay =
                                     format!("{} {}", snippet.title, snippet.body).to_lowercase();
@@ -79,71 +79,69 @@ impl HelperApp {
                                     .chars()
                                     .take(52)
                                     .collect();
-                                let mut row_copy = false;
-                                let inner = egui::Frame::new()
-                                    .fill(if selected { p.accent_soft } else { p.surface_2 })
-                                    .stroke(egui::Stroke::new(
-                                        1.0,
-                                        if selected { p.accent } else { p.border },
-                                    ))
-                                    .corner_radius(8)
-                                    .inner_margin(egui::Margin::symmetric(10, 8))
-                                    .show(ui, |ui| {
-                                        ui.set_width(ui.available_width());
-                                        ui.horizontal(|ui| {
-                                            ui.with_layout(
-                                                Layout::right_to_left(egui::Align::Center),
-                                                |ui| {
-                                                    if ui
-                                                        .small_button("Copy")
-                                                        .on_hover_text("Copy snippet")
-                                                        .clicked()
-                                                    {
-                                                        row_copy = true;
-                                                    }
-                                                    ui.with_layout(
-                                                        Layout::left_to_right(egui::Align::Center),
-                                                        |ui| {
-                                                            ui.add(
-                                                                egui::Label::new(
-                                                                    RichText::new(&snippet.title)
-                                                                        .strong()
-                                                                        .color(p.text),
-                                                                )
-                                                                .truncate(),
-                                                            );
-                                                        },
+                                ui.push_id(&snippet.id, |ui| {
+                                    egui::containers::Sides::new()
+                                        .height(52.0)
+                                        .shrink_left()
+                                        .show(
+                                            ui,
+                                            |ui| {
+                                                let inner = egui::Frame::new()
+                                                    .fill(if selected {
+                                                        p.accent_soft
+                                                    } else {
+                                                        p.surface_2
+                                                    })
+                                                    .stroke(egui::Stroke::new(
+                                                        1.0,
+                                                        if selected { p.accent } else { p.border },
+                                                    ))
+                                                    .corner_radius(8)
+                                                    .inner_margin(egui::Margin::symmetric(10, 6))
+                                                    .show(ui, |ui| {
+                                                        ui.set_width(ui.available_width());
+                                                        ui.add(
+                                                            egui::Label::new(
+                                                                RichText::new(&snippet.title)
+                                                                    .strong()
+                                                                    .color(p.text),
+                                                            )
+                                                            .truncate(),
+                                                        );
+                                                        ui.add(
+                                                            egui::Label::new(
+                                                                RichText::new(&preview)
+                                                                    .small()
+                                                                    .color(p.muted)
+                                                                    .monospace(),
+                                                            )
+                                                            .truncate(),
+                                                        );
+                                                    });
+                                                if inner.response.interact(Sense::click()).clicked()
+                                                {
+                                                    clicked = Some(snippet.id.clone());
+                                                }
+                                            },
+                                            |ui| {
+                                                if theme::ghost_button(ui, &p, "Copy").clicked() {
+                                                    let ok = clipboard::copy_text(
+                                                        ui.ctx(),
+                                                        snippet.body.clone(),
                                                     );
-                                                },
-                                            );
-                                        });
-                                        ui.add(
-                                            egui::Label::new(
-                                                RichText::new(preview)
-                                                    .small()
-                                                    .color(p.muted)
-                                                    .monospace(),
-                                            )
-                                            .truncate(),
+                                                    copied = Some((snippet.title.clone(), ok));
+                                                }
+                                            },
                                         );
-                                    });
-                                if row_copy {
-                                    copy_id = Some(snippet.id.clone());
-                                } else if inner.response.interact(Sense::click()).clicked() {
-                                    clicked = Some(snippet.id.clone());
-                                }
+                                });
                                 ui.add_space(6.0);
                             }
                             if let Some(id) = clicked {
                                 self.selected_snippet = Some(id);
                             }
-                            if let Some(id) = copy_id
-                                && let Some(snippet) =
-                                    self.store.snippets.iter().find(|s| s.id == id)
-                            {
-                                let ok = clipboard::copy_text(ui.ctx(), snippet.body.clone());
+                            if let Some((title, ok)) = copied {
                                 self.status = if ok {
-                                    format!("Copied “{}”.", snippet.title)
+                                    format!("Copied “{title}”.")
                                 } else {
                                     "Could not copy to the system clipboard.".into()
                                 };
