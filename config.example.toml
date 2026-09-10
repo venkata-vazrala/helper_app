@@ -1,0 +1,28 @@
+# Copy to the app data directory as config.toml, or edit from the Settings tab.
+# Placeholders: {path} selected file/folder, {dir} containing folder, {name} file name.
+
+[[launchers]]
+name = "Finder"
+command = "open"
+args = ["{path}"]
+
+[[launchers]]
+name = "VS Code"
+command = "code"
+args = ["{path}"]
+is_default = true
+
+[[launchers]]
+name = "Cursor"
+command = "cursor"
+args = ["{path}"]
+
+[[launchers]]
+name = "Grok"
+command = "grok"
+args = ["--cwd", "{dir}"]
+
+[[launchers]]
+name = "Terminal"
+command = "open"
+args = ["-a", "Terminal", "{dir}"]
