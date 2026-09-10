@@ -6,6 +6,7 @@ description = "Personal workspace helper: files, notes, and copy-ready snippets"
 license = "MIT"
 
 [dependencies]
+arboard = "3"
 dirs = "7.0.0"
 eframe = "0.36.2"
 egui = "0.36.2"

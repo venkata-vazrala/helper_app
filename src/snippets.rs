@@ -1,6 +1,7 @@
-use eframe::egui::{self, RichText, Sense};
+use eframe::egui::{self, Layout, RichText, Sense};
 
 use crate::app::HelperApp;
+use crate::clipboard;
 use crate::theme;
 
 impl HelperApp {
@@ -28,7 +29,7 @@ impl HelperApp {
                 if theme::chevron_button(ui, &p, true).clicked() {
                     self.reorder_selected(true);
                 }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                     theme::search_field(ui, &p, &mut self.snippet_filter, "Search snippets", 240.0);
                 });
             });
@@ -51,7 +52,7 @@ impl HelperApp {
                     ui.add_space(8.0);
                     egui::ScrollArea::vertical()
                         .id_salt("snippets_list_scroll")
-                        .auto_shrink([false, false])
+                        .auto_shrink([false, true])
                         .scroll_bar_visibility(
                             egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible,
                         )
@@ -78,6 +79,7 @@ impl HelperApp {
                                     .chars()
                                     .take(52)
                                     .collect();
+                                let mut row_copy = false;
                                 let inner = egui::Frame::new()
                                     .fill(if selected { p.accent_soft } else { p.surface_2 })
                                     .stroke(egui::Stroke::new(
@@ -89,28 +91,45 @@ impl HelperApp {
                                     .show(ui, |ui| {
                                         ui.set_width(ui.available_width());
                                         ui.horizontal(|ui| {
-                                            ui.label(
-                                                RichText::new(&snippet.title)
-                                                    .strong()
-                                                    .color(p.text),
-                                            );
                                             ui.with_layout(
-                                                egui::Layout::right_to_left(egui::Align::Center),
+                                                Layout::right_to_left(egui::Align::Center),
                                                 |ui| {
-                                                    if ui.small_button("Copy").clicked() {
-                                                        copy_id = Some(snippet.id.clone());
+                                                    if ui
+                                                        .small_button("Copy")
+                                                        .on_hover_text("Copy snippet")
+                                                        .clicked()
+                                                    {
+                                                        row_copy = true;
                                                     }
+                                                    ui.with_layout(
+                                                        Layout::left_to_right(egui::Align::Center),
+                                                        |ui| {
+                                                            ui.add(
+                                                                egui::Label::new(
+                                                                    RichText::new(&snippet.title)
+                                                                        .strong()
+                                                                        .color(p.text),
+                                                                )
+                                                                .truncate(),
+                                                            );
+                                                        },
+                                                    );
                                                 },
                                             );
                                         });
-                                        ui.label(
-                                            RichText::new(preview)
-                                                .small()
-                                                .color(p.muted)
-                                                .monospace(),
+                                        ui.add(
+                                            egui::Label::new(
+                                                RichText::new(preview)
+                                                    .small()
+                                                    .color(p.muted)
+                                                    .monospace(),
+                                            )
+                                            .truncate(),
                                         );
                                     });
-                                if inner.response.interact(Sense::click()).clicked() {
+                                if row_copy {
+                                    copy_id = Some(snippet.id.clone());
+                                } else if inner.response.interact(Sense::click()).clicked() {
                                     clicked = Some(snippet.id.clone());
                                 }
                                 ui.add_space(6.0);
@@ -122,8 +141,12 @@ impl HelperApp {
                                 && let Some(snippet) =
                                     self.store.snippets.iter().find(|s| s.id == id)
                             {
-                                ui.ctx().copy_text(snippet.body.clone());
-                                self.status = format!("Copied “{}”.", snippet.title);
+                                let ok = clipboard::copy_text(ui.ctx(), snippet.body.clone());
+                                self.status = if ok {
+                                    format!("Copied “{}”.", snippet.title)
+                                } else {
+                                    "Could not copy to the system clipboard.".into()
+                                };
                             }
                         });
                 });
@@ -156,31 +179,17 @@ impl HelperApp {
             let mut dirty = false;
             let mut copy_now = false;
             theme::card(&p).show(ui, |ui| {
+                // Compact header: one line of title, copy on the right. Body gets the rest.
                 ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label(theme::muted(&p, "Title"));
-                        if ui
-                            .add(
-                                egui::TextEdit::singleline(&mut self.store.snippets[index].title)
-                                    .desired_width(ui.available_width()),
-                            )
-                            .changed()
+                    ui.label(theme::muted(&p, "Title"));
+                    ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                        if theme::primary_button(ui, &p, "Copy")
+                            .on_hover_text("Copy body to clipboard")
+                            .clicked()
                         {
-                            dirty = true;
-                        }
-                    });
-                    ui.add_space(12.0);
-                    ui.vertical(|ui| {
-                        ui.add_space(18.0);
-                        if theme::primary_button(ui, &p, "Copy to clipboard").clicked() {
                             copy_now = true;
                         }
-                    });
-                });
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    ui.label(theme::muted(&p, "Text"));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(8.0);
                         ui.label(
                             RichText::new(format!("{lines} lines · {chars} chars"))
                                 .small()
@@ -188,6 +197,20 @@ impl HelperApp {
                         );
                     });
                 });
+                ui.add_space(4.0);
+                let title_h = ui.spacing().interact_size.y;
+                if ui
+                    .add_sized(
+                        [ui.available_width(), title_h],
+                        egui::TextEdit::singleline(&mut self.store.snippets[index].title)
+                            .hint_text("Snippet name"),
+                    )
+                    .changed()
+                {
+                    dirty = true;
+                }
+                ui.add_space(8.0);
+                ui.label(theme::muted(&p, "Text"));
                 ui.add_space(4.0);
                 if theme::scrollable_multiline(
                     ui,
@@ -203,8 +226,12 @@ impl HelperApp {
             if copy_now {
                 let body = self.store.snippets[index].body.clone();
                 let title = self.store.snippets[index].title.clone();
-                ui.ctx().copy_text(body);
-                self.status = format!("Copied “{title}”.");
+                let ok = clipboard::copy_text(ui.ctx(), body);
+                self.status = if ok {
+                    format!("Copied “{title}”.")
+                } else {
+                    "Could not copy to the system clipboard.".into()
+                };
             }
             if dirty {
                 self.mark_store_dirty();

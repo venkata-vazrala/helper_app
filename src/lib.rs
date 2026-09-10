@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod bundle;
+pub mod clipboard;
 pub mod config;
 pub mod files;
 pub mod launch;
