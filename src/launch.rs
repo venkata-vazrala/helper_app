@@ -1,3 +1,5 @@
+use std::env;
+use std::ffi::OsString;
 use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -34,11 +36,39 @@ pub fn open_with(launcher: &Launcher, path: &Path) -> io::Result<()> {
     let args = substitute(&launcher.args, path);
     Command::new(&launcher.command)
         .args(&args)
+        .env("PATH", enriched_path())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .map(|_| ())
+}
+
+/// GUI .app launches have a thin PATH. Keep Homebrew, Cargo, and Grok visible.
+fn enriched_path() -> OsString {
+    let mut parts: Vec<String> = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        parts.push(home.join(".grok/bin").display().to_string());
+        parts.push(home.join(".cargo/bin").display().to_string());
+        parts.push(home.join("bin").display().to_string());
+    }
+    parts.extend([
+        "/opt/homebrew/bin".into(),
+        "/opt/homebrew/sbin".into(),
+        "/usr/local/bin".into(),
+        "/usr/bin".into(),
+        "/bin".into(),
+        "/usr/sbin".into(),
+        "/sbin".into(),
+    ]);
+    if let Ok(existing) = env::var("PATH") {
+        for piece in existing.split(':') {
+            if !piece.is_empty() && !parts.iter().any(|p| p == piece) {
+                parts.push(piece.to_string());
+            }
+        }
+    }
+    parts.join(":").into()
 }
 
 /// Split a launcher-args field, honoring double quotes.

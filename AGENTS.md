@@ -11,10 +11,12 @@ Native Rust desktop workspace for pinned files/folders, notes, and copy-ready sn
 
 ## Commands
 
-- Run: `cargo run`
+- Run: `cargo run --release`
 - Test: `cargo test`
 - Format: `cargo fmt`
 - Lint: `cargo clippy --all-targets -- -D warnings`
+- Package macOS app: `./scripts/package.sh` (or `make app`)
+- Optional install: `./scripts/install.sh` (or `make install`)
 
 ## Conventions
 

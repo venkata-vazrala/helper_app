@@ -11,13 +11,37 @@ A small native **Rust** desktop app for a personal workspace. One window, four t
 
 This is a development-first slice. More tabs and features can land later without changing the layout.
 
-## Run
+## Run (from source)
 
 ```bash
-cargo run
+cargo run --release
 ```
 
-Requires a working Rust toolchain. On macOS, `code` / `cursor` / `grok` must be on `PATH` for those launchers to work. You can add or change launchers in **Settings**.
+On macOS, `code` / `cursor` / `grok` must be on `PATH` for those launchers to work. You can add or change launchers in **Settings**.
+
+## Ready-to-run app (no install)
+
+Rust is only needed to **build**. After that you can run Helper without Cargo:
+
+```bash
+./scripts/package.sh
+open dist/Helper.app
+```
+
+That writes:
+
+- `dist/Helper.app` — double-click in Finder
+- `dist/helper` — the same binary, for the terminal
+- `dist/Open Helper.command` — double-click helper next to the app
+
+Optional install into `/Applications`:
+
+```bash
+./scripts/install.sh
+open -a Helper
+```
+
+`make app` and `make install` do the same.
 
 ## Data
 
