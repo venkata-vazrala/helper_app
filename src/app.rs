@@ -1,11 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use eframe::egui::{self, Color32, FontId, RichText, Stroke};
+use eframe::egui::{self, Color32, FontId, RichText, Stroke, Vec2};
 
 use crate::config::{AppConfig, Launcher, config_path};
 use crate::launch;
 use crate::store::{Store, app_dir, store_path};
+use crate::theme;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -13,6 +14,26 @@ pub enum Tab {
     Notes,
     Snippets,
     Settings,
+}
+
+impl Tab {
+    fn label(self) -> &'static str {
+        match self {
+            Tab::Files => "Files",
+            Tab::Notes => "Notes",
+            Tab::Snippets => "Snippets",
+            Tab::Settings => "Settings",
+        }
+    }
+
+    fn shortcut(self) -> &'static str {
+        match self {
+            Tab::Files => "⌘1",
+            Tab::Notes => "⌘2",
+            Tab::Snippets => "⌘3",
+            Tab::Settings => "⌘4",
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -41,7 +62,7 @@ pub struct HelperApp {
 
 impl HelperApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        setup_style(&cc.egui_ctx);
+        theme::setup(&cc.egui_ctx);
 
         let app_dir = app_dir();
         let config = AppConfig::load_or_default(&config_path(&app_dir));
@@ -192,39 +213,55 @@ impl eframe::App for HelperApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.handle_shortcuts(ui.ctx());
 
-        egui::Panel::top("tabs").show(ui, |ui| {
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                ui.add_space(8.0);
-                ui.label(
-                    RichText::new("Helper")
-                        .font(FontId::proportional(18.0))
-                        .color(Color32::from_rgb(232, 236, 239))
-                        .strong(),
-                );
-                ui.add_space(16.0);
-                tab_button(ui, &mut self.tab, Tab::Files, "Files");
-                tab_button(ui, &mut self.tab, Tab::Notes, "Notes");
-                tab_button(ui, &mut self.tab, Tab::Snippets, "Snippets");
-                tab_button(ui, &mut self.tab, Tab::Settings, "Settings");
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add_space(8.0);
-                    ui.label(
-                        RichText::new("⌘1–4 switch tabs")
-                            .small()
-                            .color(Color32::from_rgb(140, 150, 160)),
-                    );
+        egui::Panel::top("chrome")
+            .exact_size(64.0)
+            .show_separator_line(false)
+            .show(ui, |ui| {
+                theme::card().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let (mark, _) =
+                            ui.allocate_exact_size(Vec2::splat(28.0), egui::Sense::hover());
+                        ui.painter().rect_filled(mark, 7.0, theme::ACCENT);
+                        ui.painter().text(
+                            mark.center(),
+                            egui::Align2::CENTER_CENTER,
+                            "H",
+                            FontId::proportional(15.0),
+                            Color32::from_rgb(12, 24, 22),
+                        );
+                        ui.add_space(6.0);
+                        ui.vertical(|ui| {
+                            ui.add_space(1.0);
+                            ui.label(
+                                RichText::new("Helper")
+                                    .size(18.0)
+                                    .strong()
+                                    .color(theme::TEXT),
+                            );
+                            ui.label(theme::muted("Workspace"));
+                        });
+                        ui.add_space(18.0);
+                        for tab in [Tab::Files, Tab::Notes, Tab::Snippets, Tab::Settings] {
+                            tab_button(ui, &mut self.tab, tab);
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(theme::muted("⌘1–4"));
+                        });
+                    });
                 });
             });
-            ui.add_space(6.0);
-        });
 
-        egui::Panel::bottom("status").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.add_space(8.0);
-                ui.label(RichText::new(&self.status).color(Color32::from_rgb(180, 190, 200)));
+        egui::Panel::bottom("status")
+            .exact_size(36.0)
+            .show_separator_line(false)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.add_space(6.0);
+                    let (dot, _) = ui.allocate_exact_size(Vec2::splat(8.0), egui::Sense::hover());
+                    ui.painter().circle_filled(dot.center(), 3.5, theme::ACCENT);
+                    ui.label(RichText::new(&self.status).color(theme::MUTED).size(13.0));
+                });
             });
-        });
 
         egui::CentralPanel::default().show(ui, |ui| match self.tab {
             Tab::Files => self.ui_files(ui),
@@ -235,49 +272,38 @@ impl eframe::App for HelperApp {
     }
 }
 
-fn tab_button(ui: &mut egui::Ui, current: &mut Tab, tab: Tab, label: &str) {
+fn tab_button(ui: &mut egui::Ui, current: &mut Tab, tab: Tab) {
     let selected = *current == tab;
     let fill = if selected {
-        Color32::from_rgb(42, 92, 88)
+        theme::ACCENT_DIM
     } else {
-        Color32::from_rgb(32, 36, 40)
+        Color32::TRANSPARENT
     };
-    let text = if selected {
-        Color32::from_rgb(220, 245, 238)
-    } else {
-        Color32::from_rgb(170, 180, 188)
-    };
-    let button = egui::Button::new(RichText::new(label).color(text).strong())
-        .fill(fill)
-        .stroke(Stroke::new(
-            1.0,
-            if selected {
-                Color32::from_rgb(78, 168, 156)
-            } else {
-                Color32::from_rgb(50, 56, 62)
-            },
-        ))
-        .min_size(egui::vec2(96.0, 28.0));
+    let text = if selected { theme::TEXT } else { theme::MUTED };
+    let button = egui::Button::new(
+        RichText::new(format!("{}  {}", tab.label(), tab.shortcut()))
+            .color(text)
+            .strong(),
+    )
+    .fill(fill)
+    .stroke(Stroke::new(
+        1.0,
+        if selected {
+            theme::ACCENT
+        } else {
+            Color32::TRANSPARENT
+        },
+    ))
+    .corner_radius(8)
+    .min_size(Vec2::new(108.0, 32.0));
     if ui.add(button).clicked() {
         *current = tab;
     }
 }
 
-fn setup_style(ctx: &egui::Context) {
-    let mut visuals = egui::Visuals::dark();
-    visuals.panel_fill = Color32::from_rgb(22, 24, 27);
-    visuals.window_fill = Color32::from_rgb(28, 31, 35);
-    visuals.extreme_bg_color = Color32::from_rgb(18, 20, 22);
-    visuals.widgets.inactive.bg_fill = Color32::from_rgb(40, 45, 50);
-    visuals.widgets.hovered.bg_fill = Color32::from_rgb(52, 64, 62);
-    visuals.widgets.active.bg_fill = Color32::from_rgb(42, 92, 88);
-    visuals.selection.bg_fill = Color32::from_rgb(42, 92, 88);
-    visuals.hyperlink_color = Color32::from_rgb(110, 198, 186);
-    ctx.set_visuals(visuals);
-}
-
 pub fn open_with_row(ui: &mut egui::Ui, app: &mut HelperApp) {
-    ui.label(RichText::new("Open with").small().weak());
+    ui.label(RichText::new("Open with").small().color(theme::MUTED));
+    ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
         let names: Vec<(usize, String, bool)> = app
             .config
@@ -287,12 +313,11 @@ pub fn open_with_row(ui: &mut egui::Ui, app: &mut HelperApp) {
             .map(|(i, l)| (i, l.name.clone(), l.is_default))
             .collect();
         for (i, name, is_default) in names {
-            let label = if is_default {
-                format!("{name} · default")
-            } else {
-                name
-            };
-            if ui.button(label).clicked() {
+            if is_default {
+                if theme::primary_button(ui, &format!("{name}  default")).clicked() {
+                    app.open_active_with_index(i);
+                }
+            } else if theme::ghost_button(ui, &name).clicked() {
                 app.open_active_with_index(i);
             }
         }
