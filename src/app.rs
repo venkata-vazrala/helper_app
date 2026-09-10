@@ -542,16 +542,20 @@ pub fn open_with_row(ui: &mut egui::Ui, app: &mut HelperApp) {
     ui.label(RichText::new("Open with").small().color(p.muted));
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
-        let names: Vec<(usize, String, bool)> = app
+        let mut names: Vec<(usize, String, bool)> = app
             .config
             .launchers
             .iter()
             .enumerate()
             .map(|(i, l)| (i, l.name.clone(), l.is_default))
             .collect();
+        names.sort_by_key(|a| std::cmp::Reverse(a.2));
         for (i, name, is_default) in names {
             if is_default {
-                if theme::primary_button(ui, &p, &format!("{name}  default")).clicked() {
+                if theme::primary_button(ui, &p, &name)
+                    .on_hover_text("Default")
+                    .clicked()
+                {
                     app.open_active_with_index(i);
                 }
             } else if theme::ghost_button(ui, &p, &name).clicked() {
