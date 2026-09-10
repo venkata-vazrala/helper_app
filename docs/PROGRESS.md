@@ -21,6 +21,7 @@
 | Appearance (dark/light/system, accent, density, scale) | done |
 | Debounced save (400ms, flush on tab/close) | done |
 | Verify (`cargo test` 24 passed, clippy `-D warnings`, fmt) | done |
+| Snippets editor: always-on scrollbars + list preview | done |
 
 ## How to check it
 

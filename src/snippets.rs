@@ -38,7 +38,7 @@ impl HelperApp {
         let filter = self.snippet_filter.to_lowercase();
         egui::Panel::left("snippets_list")
             .resizable(true)
-            .default_size(280.0)
+            .default_size(300.0)
             .show_separator_line(false)
             .show(ui, |ui| {
                 theme::card(&p).show(ui, |ui| {
@@ -49,59 +49,83 @@ impl HelperApp {
                         &format!("{} snippets", self.store.snippets.len()),
                     );
                     ui.add_space(8.0);
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        if self.store.snippets.is_empty() {
-                            ui.label(theme::muted(&p, "No snippets yet."));
-                            return;
-                        }
-                        let mut clicked = None;
-                        let mut copy_id = None;
-                        for snippet in &self.store.snippets {
-                            let hay = format!("{} {}", snippet.title, snippet.body).to_lowercase();
-                            if !filter.is_empty() && !hay.contains(&filter) {
-                                continue;
+                    egui::ScrollArea::vertical()
+                        .id_salt("snippets_list_scroll")
+                        .auto_shrink([false, false])
+                        .scroll_bar_visibility(
+                            egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible,
+                        )
+                        .show(ui, |ui| {
+                            if self.store.snippets.is_empty() {
+                                ui.label(theme::muted(&p, "No snippets yet."));
+                                return;
                             }
-                            let selected =
-                                self.selected_snippet.as_deref() == Some(snippet.id.as_str());
-                            let inner = egui::Frame::new()
-                                .fill(if selected { p.accent_soft } else { p.surface_2 })
-                                .stroke(egui::Stroke::new(
-                                    1.0,
-                                    if selected { p.accent } else { p.border },
-                                ))
-                                .corner_radius(8)
-                                .inner_margin(egui::Margin::symmetric(10, 8))
-                                .show(ui, |ui| {
-                                    ui.set_width(ui.available_width());
-                                    ui.horizontal(|ui| {
+                            let mut clicked = None;
+                            let mut copy_id = None;
+                            for snippet in &self.store.snippets {
+                                let hay =
+                                    format!("{} {}", snippet.title, snippet.body).to_lowercase();
+                                if !filter.is_empty() && !hay.contains(&filter) {
+                                    continue;
+                                }
+                                let selected =
+                                    self.selected_snippet.as_deref() == Some(snippet.id.as_str());
+                                let preview: String = snippet
+                                    .body
+                                    .lines()
+                                    .find(|line| !line.trim().is_empty())
+                                    .unwrap_or("Empty snippet")
+                                    .chars()
+                                    .take(52)
+                                    .collect();
+                                let inner = egui::Frame::new()
+                                    .fill(if selected { p.accent_soft } else { p.surface_2 })
+                                    .stroke(egui::Stroke::new(
+                                        1.0,
+                                        if selected { p.accent } else { p.border },
+                                    ))
+                                    .corner_radius(8)
+                                    .inner_margin(egui::Margin::symmetric(10, 8))
+                                    .show(ui, |ui| {
+                                        ui.set_width(ui.available_width());
+                                        ui.horizontal(|ui| {
+                                            ui.label(
+                                                RichText::new(&snippet.title)
+                                                    .strong()
+                                                    .color(p.text),
+                                            );
+                                            ui.with_layout(
+                                                egui::Layout::right_to_left(egui::Align::Center),
+                                                |ui| {
+                                                    if ui.small_button("Copy").clicked() {
+                                                        copy_id = Some(snippet.id.clone());
+                                                    }
+                                                },
+                                            );
+                                        });
                                         ui.label(
-                                            RichText::new(&snippet.title).strong().color(p.text),
-                                        );
-                                        ui.with_layout(
-                                            egui::Layout::right_to_left(egui::Align::Center),
-                                            |ui| {
-                                                if ui.small_button("Copy").clicked() {
-                                                    copy_id = Some(snippet.id.clone());
-                                                }
-                                            },
+                                            RichText::new(preview)
+                                                .small()
+                                                .color(p.muted)
+                                                .monospace(),
                                         );
                                     });
-                                });
-                            if inner.response.interact(Sense::click()).clicked() {
-                                clicked = Some(snippet.id.clone());
+                                if inner.response.interact(Sense::click()).clicked() {
+                                    clicked = Some(snippet.id.clone());
+                                }
+                                ui.add_space(6.0);
                             }
-                            ui.add_space(6.0);
-                        }
-                        if let Some(id) = clicked {
-                            self.selected_snippet = Some(id);
-                        }
-                        if let Some(id) = copy_id
-                            && let Some(snippet) = self.store.snippets.iter().find(|s| s.id == id)
-                        {
-                            ui.ctx().copy_text(snippet.body.clone());
-                            self.status = format!("Copied “{}”.", snippet.title);
-                        }
-                    });
+                            if let Some(id) = clicked {
+                                self.selected_snippet = Some(id);
+                            }
+                            if let Some(id) = copy_id
+                                && let Some(snippet) =
+                                    self.store.snippets.iter().find(|s| s.id == id)
+                            {
+                                ui.ctx().copy_text(snippet.body.clone());
+                                self.status = format!("Copied “{}”.", snippet.title);
+                            }
+                        });
                 });
             });
 
@@ -119,16 +143,25 @@ impl HelperApp {
                 return;
             };
 
+            let (lines, chars) = {
+                let body = &self.store.snippets[index].body;
+                let lines = if body.is_empty() {
+                    0
+                } else {
+                    body.lines().count()
+                };
+                (lines, body.chars().count())
+            };
+
             let mut dirty = false;
             let mut copy_now = false;
             theme::card(&p).show(ui, |ui| {
-                let snippet = &mut self.store.snippets[index];
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(theme::muted(&p, "Title"));
                         if ui
                             .add(
-                                egui::TextEdit::singleline(&mut snippet.title)
+                                egui::TextEdit::singleline(&mut self.store.snippets[index].title)
                                     .desired_width(ui.available_width()),
                             )
                             .changed()
@@ -144,17 +177,28 @@ impl HelperApp {
                         }
                     });
                 });
-                ui.add_space(10.0);
-                ui.label(theme::muted(&p, "Text"));
-                theme::inset(&p).show(ui, |ui| {
-                    let editor = egui::TextEdit::multiline(&mut snippet.body)
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(20)
-                        .font(egui::TextStyle::Monospace);
-                    if ui.add(editor).changed() {
-                        dirty = true;
-                    }
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.label(theme::muted(&p, "Text"));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(format!("{lines} lines · {chars} chars"))
+                                .small()
+                                .color(p.muted),
+                        );
+                    });
                 });
+                ui.add_space(4.0);
+                if theme::scrollable_multiline(
+                    ui,
+                    &p,
+                    format!("snippet-body-{id}"),
+                    &mut self.store.snippets[index].body,
+                )
+                .changed()
+                {
+                    dirty = true;
+                }
             });
             if copy_now {
                 let body = self.store.snippets[index].body.clone();

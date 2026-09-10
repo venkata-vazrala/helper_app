@@ -161,6 +161,37 @@ pub fn card(p: &Palette) -> Frame {
         .inner_margin(Margin::symmetric(14, 12))
 }
 
+/// Multiline editor that grows with the text and always shows scroll bars.
+pub fn scrollable_multiline(
+    ui: &mut egui::Ui,
+    p: &Palette,
+    id: impl std::hash::Hash + std::fmt::Debug,
+    text: &mut String,
+) -> egui::Response {
+    let height = (ui.available_height() - 4.0).max(160.0);
+    let inner = inset(p).show(ui, |ui| {
+        ui.set_min_height(height);
+        egui::ScrollArea::both()
+            .id_salt(id)
+            .auto_shrink([false, false])
+            .scroll_bar_visibility(
+                egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible,
+            )
+            .max_height(height)
+            .show(ui, |ui| {
+                ui.add(
+                    egui::TextEdit::multiline(text)
+                        .desired_width(ui.available_width().max(480.0))
+                        .desired_rows(28)
+                        .font(TextStyle::Monospace)
+                        .background_color(p.inset),
+                )
+            })
+            .inner
+    });
+    inner.inner
+}
+
 pub fn inset(p: &Palette) -> Frame {
     Frame::new()
         .fill(p.inset)

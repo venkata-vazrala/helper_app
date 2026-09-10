@@ -126,15 +126,11 @@ impl HelperApp {
                 }
                 ui.add_space(10.0);
                 ui.label(theme::muted(&p, "Body"));
-                theme::inset(&p).show(ui, |ui| {
-                    let editor = egui::TextEdit::multiline(&mut note.body)
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(22)
-                        .font(egui::TextStyle::Monospace);
-                    if ui.add(editor).changed() {
-                        dirty = true;
-                    }
-                });
+                if theme::scrollable_multiline(ui, &p, format!("note-body-{id}"), &mut note.body)
+                    .changed()
+                {
+                    dirty = true;
+                }
             });
             if dirty {
                 self.store.notes[index].updated_unix = now_unix();
