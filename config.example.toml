@@ -19,8 +19,8 @@ args = ["{path}"]
 
 [[launchers]]
 name = "Antigravity IDE"
-command = "antigravity-ide"
-args = ["{path}"]
+command = "open"
+args = ["-a", "Antigravity IDE", "{path}"]
 
 [[launchers]]
 name = "Grok"

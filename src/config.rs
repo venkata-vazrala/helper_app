@@ -213,10 +213,21 @@ pub fn default_launchers() -> Vec<Launcher> {
 fn antigravity_launcher() -> Launcher {
     Launcher {
         name: "Antigravity IDE".into(),
-        command: "antigravity-ide".into(),
-        args: vec!["{path}".into()],
+        command: "open".into(),
+        args: vec!["-a".into(), "Antigravity IDE".into(), "{path}".into()],
         is_default: false,
     }
+}
+
+fn is_antigravity(launcher: &Launcher) -> bool {
+    launcher.command == "antigravity-ide"
+        || launcher.command == "agy-ide"
+        || launcher.name.eq_ignore_ascii_case("Antigravity IDE")
+        || launcher.name.eq_ignore_ascii_case("Antigravity")
+        || launcher
+            .args
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case("Antigravity IDE"))
 }
 
 impl AppConfig {
@@ -248,24 +259,42 @@ impl AppConfig {
             .or_else(|| self.launchers.first())
     }
 
-    /// Add built-in launchers that older configs may not have. Returns true if anything was added.
+    /// Add built-in launchers that older configs may not have. VS Code stays the default.
     pub fn ensure_known_launchers(&mut self) -> bool {
-        let has_antigravity = self.launchers.iter().any(|l| {
-            l.command == "antigravity-ide"
-                || l.name.eq_ignore_ascii_case("Antigravity IDE")
-                || l.name.eq_ignore_ascii_case("Antigravity")
-        });
-        if has_antigravity {
-            return false;
+        let mut changed = false;
+        if let Some(existing) = self.launchers.iter_mut().find(|l| is_antigravity(l)) {
+            let wanted = antigravity_launcher();
+            if existing.command != wanted.command || existing.args != wanted.args {
+                existing.command = wanted.command;
+                existing.args = wanted.args;
+                existing.name = wanted.name;
+                existing.is_default = false;
+                changed = true;
+            } else if existing.is_default {
+                existing.is_default = false;
+                changed = true;
+            }
+        } else {
+            let insert_at = self
+                .launchers
+                .iter()
+                .position(|l| l.name.eq_ignore_ascii_case("Cursor"))
+                .map(|i| i + 1)
+                .unwrap_or(self.launchers.len());
+            self.launchers.insert(insert_at, antigravity_launcher());
+            changed = true;
         }
-        let insert_at = self
-            .launchers
-            .iter()
-            .position(|l| l.name.eq_ignore_ascii_case("Cursor"))
-            .map(|i| i + 1)
-            .unwrap_or(self.launchers.len());
-        self.launchers.insert(insert_at, antigravity_launcher());
-        true
+
+        if !self.launchers.iter().any(|l| l.is_default)
+            && let Some(vs) = self
+                .launchers
+                .iter_mut()
+                .find(|l| l.command == "code" || l.name.eq_ignore_ascii_case("VS Code"))
+        {
+            vs.is_default = true;
+            changed = true;
+        }
+        changed
     }
 }
 
@@ -297,8 +326,15 @@ mod tests {
         assert!(names.contains(&"VS Code"));
         assert!(names.contains(&"Grok"));
         assert!(names.contains(&"Antigravity IDE"));
-        assert!(cfg.launchers.iter().any(|l| l.command == "antigravity-ide"));
-        assert!(cfg.launchers.iter().any(|l| l.is_default));
+        let ag = cfg
+            .launchers
+            .iter()
+            .find(|l| l.name == "Antigravity IDE")
+            .unwrap();
+        assert_eq!(ag.command, "open");
+        assert!(!ag.is_default);
+        let vs = cfg.launchers.iter().find(|l| l.name == "VS Code").unwrap();
+        assert!(vs.is_default);
     }
 
     #[test]
@@ -316,9 +352,14 @@ mod tests {
         assert_eq!(
             cfg.launchers
                 .iter()
-                .filter(|l| l.command == "antigravity-ide")
+                .filter(|l| l.name == "Antigravity IDE")
                 .count(),
             1
+        );
+        assert!(
+            !cfg.launchers
+                .iter()
+                .any(|l| l.is_default && l.name == "Antigravity IDE")
         );
         assert!(!cfg.ensure_known_launchers());
     }
