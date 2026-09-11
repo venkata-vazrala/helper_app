@@ -194,6 +194,7 @@ pub fn default_launchers() -> Vec<Launcher> {
             args: vec!["{path}".into()],
             is_default: false,
         },
+        antigravity_launcher(),
         Launcher {
             name: "Grok".into(),
             command: "grok".into(),
@@ -207,6 +208,15 @@ pub fn default_launchers() -> Vec<Launcher> {
             is_default: false,
         },
     ]
+}
+
+fn antigravity_launcher() -> Launcher {
+    Launcher {
+        name: "Antigravity IDE".into(),
+        command: "antigravity-ide".into(),
+        args: vec!["{path}".into()],
+        is_default: false,
+    }
 }
 
 impl AppConfig {
@@ -237,6 +247,26 @@ impl AppConfig {
             .find(|l| l.is_default)
             .or_else(|| self.launchers.first())
     }
+
+    /// Add built-in launchers that older configs may not have. Returns true if anything was added.
+    pub fn ensure_known_launchers(&mut self) -> bool {
+        let has_antigravity = self.launchers.iter().any(|l| {
+            l.command == "antigravity-ide"
+                || l.name.eq_ignore_ascii_case("Antigravity IDE")
+                || l.name.eq_ignore_ascii_case("Antigravity")
+        });
+        if has_antigravity {
+            return false;
+        }
+        let insert_at = self
+            .launchers
+            .iter()
+            .position(|l| l.name.eq_ignore_ascii_case("Cursor"))
+            .map(|i| i + 1)
+            .unwrap_or(self.launchers.len());
+        self.launchers.insert(insert_at, antigravity_launcher());
+        true
+    }
 }
 
 pub fn config_path(app_dir: &Path) -> PathBuf {
@@ -266,7 +296,31 @@ mod tests {
         let names: Vec<_> = cfg.launchers.iter().map(|l| l.name.as_str()).collect();
         assert!(names.contains(&"VS Code"));
         assert!(names.contains(&"Grok"));
+        assert!(names.contains(&"Antigravity IDE"));
+        assert!(cfg.launchers.iter().any(|l| l.command == "antigravity-ide"));
         assert!(cfg.launchers.iter().any(|l| l.is_default));
+    }
+
+    #[test]
+    fn ensure_known_launchers_inserts_antigravity_once() {
+        let mut cfg = AppConfig {
+            launchers: vec![Launcher {
+                name: "Finder".into(),
+                command: "open".into(),
+                args: vec!["{path}".into()],
+                is_default: false,
+            }],
+            appearance: Appearance::default(),
+        };
+        assert!(cfg.ensure_known_launchers());
+        assert_eq!(
+            cfg.launchers
+                .iter()
+                .filter(|l| l.command == "antigravity-ide")
+                .count(),
+            1
+        );
+        assert!(!cfg.ensure_known_launchers());
     }
 
     #[test]

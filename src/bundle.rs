@@ -54,13 +54,17 @@ impl HelperBundle {
             && let Ok(mut bundle) = Self::parse_json(&text)
         {
             bundle.settings.appearance.clamp();
+            if bundle.settings.ensure_known_launchers() {
+                let _ = bundle.save(&path);
+            }
             return bundle;
         }
 
-        let migrated = Self {
+        let mut migrated = Self {
             workspace: Store::load_or_default(&store_path(app_dir)),
             settings: AppConfig::load_or_default(&config_path(app_dir)),
         };
+        let _ = migrated.settings.ensure_known_launchers();
         let _ = migrated.save(&path);
         migrated
     }

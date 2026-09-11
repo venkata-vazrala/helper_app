@@ -63,3 +63,7 @@ See `config.example.toml` for the launcher format. Placeholders:
 ## Grok
 
 This repo is set up for Grok Build: `AGENTS.md`, `.grok/lsp.json` (rust-analyzer), and a git history. There is no `grok init` CLI command; those files are the project init.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

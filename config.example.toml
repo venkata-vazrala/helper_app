@@ -18,6 +18,11 @@ command = "cursor"
 args = ["{path}"]
 
 [[launchers]]
+name = "Antigravity IDE"
+command = "antigravity-ide"
+args = ["{path}"]
+
+[[launchers]]
 name = "Grok"
 command = "grok"
 args = ["--cwd", "{dir}"]
