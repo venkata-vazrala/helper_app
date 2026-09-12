@@ -1,69 +1,73 @@
 # Helper
 
-A small native **Rust** desktop app for a personal workspace. One window, four tabs:
+A native **Rust** desktop workspace: pinned files and folders, notes, copy-ready snippets, and configurable **Open with** apps. Data stays on your machine.
 
 | Tab | What it is |
 | --- | --- |
-| **Files** | Pinned files and folders, with configurable **Open with** (VS Code, Grok, Finder, …) |
-| **Notes** | A local collection of notes |
-| **Snippets** | Copy-ready text (clipboard) |
-| **Settings** | Launchers and data location |
+| **Files** | Pin files and folders; open them in VS Code, Finder, Antigravity IDE, or any launcher you add |
+| **Notes** | Local notes |
+| **Snippets** | Copy-ready text |
+| **Settings** | Launchers, appearance, import/export |
 
-This is a development-first slice. More tabs and features can land later without changing the layout.
+Unpinning a path moves it to **Recents**. Reorder with the chevron buttons or `Alt+↑` / `Alt+↓` (`Option` on macOS).
 
-Unpinning a file or folder moves it to **Recents** (not gone). Reorder lists with ▴ ▾ or `⌥↑` / `⌥↓`. Settings covers appearance (light / dark / system) and import/export of workspace data. Plan and task tracking live in `docs/`.
+## Supported devices
 
-## Run (from source)
+| Platform | Status | How to run |
+| --- | --- | --- |
+| **macOS** 11+ (Intel and Apple Silicon) | Primary | `cargo run --release` or `./scripts/package.sh` → `dist/Helper.app` |
+| **Linux** (X11 / Wayland) | Builds and runs from source | `cargo run --release` (needs GTK 3 headers to compile) |
+| **Windows** 10+ | Builds and runs from source | `cargo run --release` |
+
+Default Open-with entries are **per OS** (Finder/`open` on macOS, `xdg-open` on Linux, Explorer on Windows). VS Code is the default editor on all three if `code` is on `PATH`. You can add or change launchers in Settings.
+
+There is no iOS, Android, or web build.
+
+## Requirements
+
+- [Rust](https://rustup.rs/) **stable** (see `rust-toolchain.toml`)
+- Linux packages for a source build: `libgtk-3-dev` plus the usual xcb / xkb libraries
+
+## Run from source
 
 ```bash
+cargo test --locked
 cargo run --release
 ```
 
-On macOS, `code` / `cursor` / `grok` must be on `PATH` for those launchers to work. You can add or change launchers in **Settings**.
-
-## Ready-to-run app (no install)
-
-Rust is only needed to **build**. After that you can run Helper without Cargo:
+## macOS app bundle (no Cargo needed to run)
 
 ```bash
 ./scripts/package.sh
 open dist/Helper.app
 ```
 
-That writes:
-
-- `dist/Helper.app` — double-click in Finder
-- `dist/helper` — the same binary, for the terminal
-- `dist/Open Helper.command` — double-click helper next to the app
-
-Optional install into `/Applications`:
+Optional copy into `/Applications`:
 
 ```bash
 ./scripts/install.sh
-open -a Helper
 ```
 
-`make app` and `make install` do the same.
+`make app` and `make install` wrap the same scripts. Packaging is Darwin-only.
 
 ## Data
 
-User data is **not** in this repo. It lives in the OS app-data directory:
+Helper does **not** store workspace data in this git repo. One JSON file holds pins, notes, snippets, recents, launchers, and appearance:
 
-- macOS: `~/Library/Application Support/helper-app/helper.json`
-  - one JSON file for workspace (pins, notes, snippets, recents) **and** settings (launchers, appearance)
+| OS | Path |
+| --- | --- |
+| macOS | `~/Library/Application Support/helper-app/helper.json` |
+| Linux | `~/.local/share/helper-app/helper.json` |
+| Windows | `%APPDATA%\helper-app\helper.json` |
 
-Older `store.json` / `config.toml` files are migrated into `helper.json` on first launch.
+Older `store.json` / `config.toml` files in that folder are migrated on first launch.
 
-See `config.example.toml` for the launcher format. Placeholders:
+Launcher placeholders: `{path}`, `{dir}`, `{name}`. See `config.example.toml`.
 
-- `{path}` — the selected file or folder
-- `{dir}` — the folder itself, or the parent of a file
-- `{name}` — the file or folder name
+## Security
 
-## Grok
-
-This repo is set up for Grok Build: `AGENTS.md`, `.grok/lsp.json` (rust-analyzer), and a git history. There is no `grok init` CLI command; those files are the project init.
+Helper is local-only. **Open with** runs programs you configure (or import). Do not import a `helper.json` from an untrusted source. See [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Copyright is held by Helper contributors — this repository contains no personal contact details.

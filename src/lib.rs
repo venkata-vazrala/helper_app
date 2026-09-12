@@ -1,6 +1,7 @@
 //! Helper workspace library. The binary is a thin native window around this crate.
 
 pub mod app;
+pub mod atomic;
 pub mod bundle;
 pub mod clipboard;
 pub mod config;

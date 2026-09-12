@@ -3,7 +3,7 @@ use std::fs;
 use eframe::egui::{self, RichText};
 
 use crate::app::{HelperApp, PendingAction, confirm_pending, maybe_import_bundle_text};
-use crate::bundle::{HelperBundle, bundle_path};
+use crate::bundle::bundle_path;
 use crate::config::{AccentColor, Density, Launcher, ThemeChoice, default_launchers};
 use crate::launch::split_args;
 use crate::theme;
@@ -152,8 +152,7 @@ impl HelperApp {
                         .set_file_name("helper.json")
                         .save_file()
                 {
-                    let bundle = HelperBundle::from_parts(self.store.clone(), self.config.clone());
-                    match bundle.save(&path) {
+                    match crate::bundle::save_parts(&path, &self.store, &self.config) {
                         Ok(()) => self.status = format!("Exported {}", path.display()),
                         Err(err) => self.status = format!("Export failed: {err}"),
                     }
@@ -163,25 +162,45 @@ impl HelperApp {
                         .add_filter("JSON", &["json"])
                         .pick_file()
                 {
-                    match fs::read_to_string(&path) {
-                        Ok(text) => maybe_import_bundle_text(self, text),
+                    match fs::read(&path) {
+                        Ok(bytes) if bytes.len() > crate::bundle::MAX_JSON_BYTES => {
+                            self.status = "Import rejected: file is too large.".into();
+                        }
+                        Ok(bytes) => match String::from_utf8(bytes) {
+                            Ok(text) => maybe_import_bundle_text(self, text),
+                            Err(_) => self.status = "Import rejected: file is not UTF-8.".into(),
+                        },
                         Err(err) => self.status = format!("Could not read file: {err}"),
                     }
                 }
                 if theme::ghost_button(ui, &p, "Open data folder").clicked() {
                     let dir = self.app_dir.clone();
-                    if let Some(finder) = self
-                        .config
-                        .launchers
-                        .iter()
-                        .find(|l| l.name.eq_ignore_ascii_case("Finder"))
-                        .cloned()
-                    {
-                        self.open_path_with(&finder, &dir);
-                    } else {
-                        let _ = std::process::Command::new("open").arg(&dir).spawn();
-                        self.status = "Opened data folder.".into();
-                    }
+                    let result = {
+                        #[cfg(target_os = "macos")]
+                        {
+                            std::process::Command::new("open").arg(&dir).spawn()
+                        }
+                        #[cfg(target_os = "linux")]
+                        {
+                            std::process::Command::new("xdg-open").arg(&dir).spawn()
+                        }
+                        #[cfg(target_os = "windows")]
+                        {
+                            std::process::Command::new("explorer").arg(&dir).spawn()
+                        }
+                        #[cfg(not(any(
+                            target_os = "macos",
+                            target_os = "linux",
+                            target_os = "windows"
+                        )))]
+                        {
+                            std::process::Command::new("xdg-open").arg(&dir).spawn()
+                        }
+                    };
+                    self.status = match result {
+                        Ok(_) => "Opened data folder.".into(),
+                        Err(err) => format!("Could not open data folder: {err}"),
+                    };
                 }
             });
         });

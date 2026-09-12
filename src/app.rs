@@ -32,12 +32,11 @@ impl Tab {
     }
 
     fn shortcut(self) -> &'static str {
-        match self {
-            Tab::Files => "⌘1",
-            Tab::Notes => "⌘2",
-            Tab::Snippets => "⌘3",
-            Tab::Settings => "⌘4",
-        }
+        #[cfg(target_os = "macos")]
+        let keys = ["⌘1", "⌘2", "⌘3", "⌘4"];
+        #[cfg(not(target_os = "macos"))]
+        let keys = ["Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4"];
+        keys[self as usize]
     }
 }
 
@@ -73,12 +72,14 @@ pub struct HelperApp {
     pub last_edit: Option<Instant>,
     pub pending: Option<PendingAction>,
     last_style: Option<(egui::Theme, Appearance)>,
+    /// When helper.json could not be parsed, never overwrite it until import/reload succeeds.
+    suppress_save: bool,
 }
 
 impl HelperApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let app_dir = app_dir();
-        let mut bundle = HelperBundle::load(&app_dir);
+        let (mut bundle, load_warning) = HelperBundle::load(&app_dir);
         bundle.settings.appearance.clamp();
         let config = bundle.settings;
         let store = bundle.workspace;
@@ -90,6 +91,7 @@ impl HelperApp {
         let active_path = store.pins.first().map(|p| p.path.clone());
         let selected_note = store.notes.first().map(|n| n.id.clone());
         let selected_snippet = store.snippets.first().map(|s| s.id.clone());
+        let suppress_save = load_warning.is_some();
 
         let mut app = Self {
             app_dir,
@@ -104,16 +106,16 @@ impl HelperApp {
             listing: Vec::new(),
             listing_error: None,
             filter: String::new(),
-            status: "Ready.".into(),
+            status: load_warning.unwrap_or_else(|| "Ready.".into()),
             note_filter: String::new(),
             snippet_filter: String::new(),
             store_dirty: false,
             last_edit: None,
             pending: None,
             last_style: None,
+            suppress_save,
         };
         app.refresh_listing();
-        let _ = app.persist_all();
         app
     }
 
@@ -126,8 +128,14 @@ impl HelperApp {
     }
 
     fn persist_bundle(&mut self) {
-        let bundle = HelperBundle::from_parts(self.store.clone(), self.config.clone());
-        if let Err(err) = bundle.save(&bundle_path(&self.app_dir)) {
+        if self.suppress_save {
+            self.status =
+                "Save skipped: helper.json could not be read. Import or fix the file first.".into();
+            return;
+        }
+        if let Err(err) =
+            crate::bundle::save_parts(&bundle_path(&self.app_dir), &self.store, &self.config)
+        {
             self.status = format!("Could not save: {err}");
         } else {
             self.store_dirty = false;
@@ -143,13 +151,6 @@ impl HelperApp {
         if self.store_dirty {
             self.persist_store();
         }
-    }
-
-    fn persist_all(&mut self) -> std::io::Result<()> {
-        HelperBundle::from_parts(self.store.clone(), self.config.clone())
-            .save(&bundle_path(&self.app_dir))?;
-        self.store_dirty = false;
-        Ok(())
     }
 
     pub fn refresh_listing(&mut self) {
@@ -302,7 +303,7 @@ impl HelperApp {
 
     pub fn reload_from_disk(&mut self) {
         self.flush_store();
-        let bundle = HelperBundle::load(&self.app_dir);
+        let (bundle, warning) = HelperBundle::load(&self.app_dir);
         self.config = bundle.settings;
         self.config.appearance.clamp();
         self.store = bundle.workspace;
@@ -311,7 +312,8 @@ impl HelperApp {
         self.selected_note = self.store.notes.first().map(|n| n.id.clone());
         self.selected_snippet = self.store.snippets.first().map(|s| s.id.clone());
         self.refresh_listing();
-        self.status = "Reloaded from disk.".into();
+        self.suppress_save = warning.is_some();
+        self.status = warning.unwrap_or_else(|| "Reloaded from disk.".into());
         self.invalidate_style();
     }
 
@@ -323,6 +325,7 @@ impl HelperApp {
         self.store = bundle.workspace;
         self.config = bundle.settings;
         self.config.appearance.clamp();
+        self.suppress_save = false;
         self.persist_bundle();
         self.selected_pin = self.store.pins.first().map(|p| p.id.clone());
         self.active_path = self.store.pins.first().map(|p| p.path.clone());

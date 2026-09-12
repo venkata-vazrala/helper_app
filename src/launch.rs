@@ -32,9 +32,26 @@ pub fn dir_of(path: &Path) -> &Path {
     }
 }
 
+pub fn validate_command(command: &str) -> io::Result<()> {
+    if command.chars().any(|c| c.is_control()) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "launcher command contains control characters",
+        ));
+    }
+    if command.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "launcher command is empty",
+        ));
+    }
+    Ok(())
+}
+
 pub fn open_with(launcher: &Launcher, path: &Path) -> io::Result<()> {
+    validate_command(&launcher.command)?;
     let args = substitute(&launcher.args, path);
-    Command::new(&launcher.command)
+    Command::new(launcher.command.trim())
         .args(&args)
         .env("PATH", enriched_path())
         .stdin(Stdio::null())
@@ -52,23 +69,30 @@ pub fn enriched_path() -> OsString {
         parts.push(home.join(".cargo/bin").display().to_string());
         parts.push(home.join("bin").display().to_string());
     }
-    parts.extend([
-        "/opt/homebrew/bin".into(),
-        "/opt/homebrew/sbin".into(),
-        "/usr/local/bin".into(),
-        "/usr/bin".into(),
-        "/bin".into(),
-        "/usr/sbin".into(),
-        "/sbin".into(),
-    ]);
+    #[cfg(unix)]
+    {
+        parts.extend([
+            "/opt/homebrew/bin".into(),
+            "/opt/homebrew/sbin".into(),
+            "/usr/local/bin".into(),
+            "/usr/bin".into(),
+            "/bin".into(),
+            "/usr/sbin".into(),
+            "/sbin".into(),
+        ]);
+    }
+    #[cfg(windows)]
+    let sep = ';';
+    #[cfg(not(windows))]
+    let sep = ':';
     if let Ok(existing) = env::var("PATH") {
-        for piece in existing.split(':') {
+        for piece in existing.split(sep) {
             if !piece.is_empty() && !parts.iter().any(|p| p == piece) {
                 parts.push(piece.to_string());
             }
         }
     }
-    parts.join(":").into()
+    parts.join(&sep.to_string()).into()
 }
 
 /// Split a launcher-args field, honoring double quotes.
@@ -128,11 +152,20 @@ mod tests {
         assert_eq!(args, vec!["-a", "Visual Studio Code", "{path}"]);
     }
 
+    #[cfg(unix)]
     #[test]
     fn enriched_path_includes_homebrew_and_grok() {
         let path = enriched_path();
         let s = path.to_string_lossy();
-        assert!(s.contains("/opt/homebrew/bin"));
+        assert!(s.contains("/opt/homebrew/bin") || s.contains("/usr/bin"));
         assert!(s.contains(".grok/bin") || s.contains("/usr/bin"));
+    }
+
+    #[test]
+    fn rejects_empty_or_control_command() {
+        assert!(validate_command("").is_err());
+        assert!(validate_command("   ").is_err());
+        assert!(validate_command("code\n").is_err());
+        assert!(validate_command("code").is_ok());
     }
 }

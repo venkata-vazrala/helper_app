@@ -3,3 +3,12 @@
 **/*.rs.bk
 .DS_Store
 /Cargo.lock.bak
+.idea/
+.vscode/
+*.swp
+helper.json
+.env
+.env.*
+*.pem
+*.tmp
+**/*.json.tmp

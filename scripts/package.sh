@@ -2,6 +2,11 @@
 # Build a double-clickable macOS app. Rust is needed to *build*, not to *run*.
 set -euo pipefail
 
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "package.sh builds a macOS .app and only runs on Darwin." >&2
+  exit 1
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 

@@ -6,8 +6,8 @@ Native Rust desktop workspace for pinned files/folders, notes, and copy-ready sn
 
 - Rust (edition 2024), binary crate `helper`
 - GUI: `eframe` + `egui` (no web/JS frontend)
-- Persistence: TOML config + JSON store under the OS app-data directory
-- Open-with targets are user-configurable launchers, never a hardcoded editor
+- Persistence: one `helper.json` under the OS app-data directory
+- Open-with targets are user-configurable, per-OS defaults; VS Code is the default editor when present
 
 ## Commands
 

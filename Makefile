@@ -1,4 +1,4 @@
-.PHONY: run test fmt clippy app install
+.PHONY: run test fmt clippy ci app install
 
 run:
 	cargo run --release
@@ -11,6 +11,11 @@ fmt:
 
 clippy:
 	cargo clippy --all-targets -- -D warnings
+
+ci:
+	cargo fmt --all -- --check
+	cargo clippy --all-targets -- -D warnings
+	cargo test --locked
 
 # Build dist/Helper.app — double-click to run, no cargo needed after this.
 app:

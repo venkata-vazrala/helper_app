@@ -1,4 +1,5 @@
-# Copy to the app data directory as config.toml, or edit from the Settings tab.
+# Example launchers (macOS-oriented). The running app writes helper.json instead.
+# Linux/Windows get different defaults at runtime. Edit from the Settings tab.
 # Placeholders: {path} selected file/folder, {dir} containing folder, {name} file name.
 
 [[launchers]]

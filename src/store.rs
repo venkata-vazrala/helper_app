@@ -98,9 +98,7 @@ impl Store {
             fs::create_dir_all(parent)?;
         }
         let text = serde_json::to_string_pretty(self).map_err(io::Error::other)?;
-        let tmp = path.with_extension("json.tmp");
-        fs::write(&tmp, text)?;
-        fs::rename(tmp, path)
+        crate::atomic::write_atomic(path, text.as_bytes())
     }
 
     pub fn add_pin(&mut self, path: PathBuf) -> String {
@@ -191,7 +189,7 @@ pub fn import_store(dest: &Path, text: &str) -> Result<Store, String> {
 
 pub fn app_dir() -> PathBuf {
     dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
+        .unwrap_or_else(std::env::temp_dir)
         .join("helper-app")
 }
 

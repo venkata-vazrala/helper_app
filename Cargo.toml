@@ -2,8 +2,18 @@
 name = "helper"
 version = "0.1.0"
 edition = "2024"
-description = "Personal workspace helper: files, notes, and copy-ready snippets"
+rust-version = "1.88"
+description = "Local desktop workspace: files, notes, snippets, and configurable open-with launchers"
 license = "MIT"
+readme = "README.md"
+keywords = ["desktop", "workspace", "notes"]
+categories = ["gui"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+opt-level = 3
 
 [dependencies]
 arboard = "3"

@@ -175,13 +175,8 @@ impl Default for AppConfig {
 }
 
 pub fn default_launchers() -> Vec<Launcher> {
-    vec![
-        Launcher {
-            name: "Finder".into(),
-            command: "open".into(),
-            args: vec!["{path}".into()],
-            is_default: false,
-        },
+    let mut launchers = vec![
+        system_open_launcher(),
         Launcher {
             name: "VS Code".into(),
             command: "code".into(),
@@ -201,21 +196,97 @@ pub fn default_launchers() -> Vec<Launcher> {
             args: vec!["--cwd".into(), "{dir}".into()],
             is_default: false,
         },
+    ];
+    launchers.extend(terminal_launchers());
+    launchers
+}
+
+fn system_open_launcher() -> Launcher {
+    #[cfg(target_os = "macos")]
+    {
         Launcher {
+            name: "Finder".into(),
+            command: "open".into(),
+            args: vec!["{path}".into()],
+            is_default: false,
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Launcher {
+            name: "Files".into(),
+            command: "xdg-open".into(),
+            args: vec!["{path}".into()],
+            is_default: false,
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Launcher {
+            name: "Explorer".into(),
+            command: "explorer".into(),
+            args: vec!["{path}".into()],
+            is_default: false,
+        }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        Launcher {
+            name: "Open".into(),
+            command: "xdg-open".into(),
+            args: vec!["{path}".into()],
+            is_default: false,
+        }
+    }
+}
+
+fn antigravity_launcher() -> Launcher {
+    #[cfg(target_os = "macos")]
+    {
+        Launcher {
+            name: "Antigravity IDE".into(),
+            command: "open".into(),
+            args: vec!["-a".into(), "Antigravity IDE".into(), "{path}".into()],
+            is_default: false,
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Launcher {
+            name: "Antigravity IDE".into(),
+            command: "antigravity-ide".into(),
+            args: vec!["{path}".into()],
+            is_default: false,
+        }
+    }
+}
+
+fn terminal_launchers() -> Vec<Launcher> {
+    #[cfg(target_os = "macos")]
+    {
+        vec![Launcher {
             name: "Terminal".into(),
             command: "open".into(),
             args: vec!["-a".into(), "Terminal".into(), "{dir}".into()],
             is_default: false,
-        },
-    ]
-}
-
-fn antigravity_launcher() -> Launcher {
-    Launcher {
-        name: "Antigravity IDE".into(),
-        command: "open".into(),
-        args: vec!["-a".into(), "Antigravity IDE".into(), "{path}".into()],
-        is_default: false,
+        }]
+    }
+    #[cfg(target_os = "linux")]
+    {
+        vec![Launcher {
+            name: "Terminal".into(),
+            command: "x-terminal-emulator".into(),
+            args: vec!["--working-directory".into(), "{dir}".into()],
+            is_default: false,
+        }]
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Vec::new()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        Vec::new()
     }
 }
 
@@ -249,7 +320,7 @@ impl AppConfig {
             fs::create_dir_all(parent)?;
         }
         let text = toml::to_string_pretty(self).map_err(io::Error::other)?;
-        atomic_write(path, text.as_bytes())
+        crate::atomic::write_atomic(path, text.as_bytes())
     }
 
     pub fn default_launcher(&self) -> Option<&Launcher> {
@@ -309,12 +380,6 @@ pub fn import_config(dest: &Path, text: &str) -> Result<AppConfig, String> {
     Ok(cfg)
 }
 
-fn atomic_write(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let tmp = path.with_extension("toml.tmp");
-    fs::write(&tmp, bytes)?;
-    fs::rename(tmp, path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326,12 +391,18 @@ mod tests {
         assert!(names.contains(&"VS Code"));
         assert!(names.contains(&"Grok"));
         assert!(names.contains(&"Antigravity IDE"));
+        assert!(
+            names.contains(&"Finder") || names.contains(&"Files") || names.contains(&"Explorer")
+        );
         let ag = cfg
             .launchers
             .iter()
             .find(|l| l.name == "Antigravity IDE")
             .unwrap();
+        #[cfg(target_os = "macos")]
         assert_eq!(ag.command, "open");
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(ag.command, "antigravity-ide");
         assert!(!ag.is_default);
         let vs = cfg.launchers.iter().find(|l| l.name == "VS Code").unwrap();
         assert!(vs.is_default);
