@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2};
+use eframe::egui::{self, Align2, Color32, FontId, Pos2, RichText, Sense, Stroke, Vec2};
 
 use crate::bundle::{HelperBundle, bundle_path, import_bundle};
 use crate::config::{AppConfig, Appearance, Density, Launcher, ThemeChoice};
@@ -407,7 +407,6 @@ impl eframe::App for HelperApp {
             )
             .show_separator_line(false)
             .show(ui, |ui| {
-                let mut selected_rect: Option<Rect> = None;
                 ui.horizontal_centered(|ui| {
                     let (mark, _) = ui.allocate_exact_size(Vec2::splat(26.0), egui::Sense::hover());
                     ui.painter().rect_filled(mark, 6.0, p.accent);
@@ -421,15 +420,11 @@ impl eframe::App for HelperApp {
                     ui.add_space(8.0);
                     ui.label(RichText::new("Helper").size(16.0).strong().color(p.text));
                     ui.add_space(22.0);
-                    ui.spacing_mut().item_spacing.x = 2.0;
+                    ui.spacing_mut().item_spacing.x = 6.0;
                     let mut clicked_tab = None;
                     for tab in [Tab::Files, Tab::Notes, Tab::Snippets, Tab::Settings] {
                         let selected = self.tab == tab;
-                        let (rect, clicked) = tab_chip(ui, &p, selected, tab);
-                        if selected {
-                            selected_rect = Some(rect);
-                        }
-                        if clicked {
+                        if tab_chip(ui, &p, selected, tab) {
                             clicked_tab = Some(tab);
                         }
                     }
@@ -438,18 +433,11 @@ impl eframe::App for HelperApp {
                     }
                 });
                 let bar = ui.max_rect();
-                let y = bar.bottom() - 1.0;
-                let line = Stroke::new(1.0, p.border);
-                if let Some(sel) = selected_rect {
-                    if sel.left() > bar.left() {
-                        ui.painter().hline(bar.left()..=sel.left() + 1.0, y, line);
-                    }
-                    if sel.right() < bar.right() {
-                        ui.painter().hline(sel.right() - 1.0..=bar.right(), y, line);
-                    }
-                } else {
-                    ui.painter().hline(bar.x_range(), y, line);
-                }
+                ui.painter().hline(
+                    bar.x_range(),
+                    bar.bottom() - 1.0,
+                    Stroke::new(1.0, p.border),
+                );
             });
 
         egui::Panel::bottom("status")
@@ -491,53 +479,35 @@ fn resolve_theme(ctx: &egui::Context, choice: ThemeChoice) -> egui::Theme {
     }
 }
 
-fn tab_chip(ui: &mut egui::Ui, p: &Palette, selected: bool, tab: Tab) -> (Rect, bool) {
-    let size = Vec2::new(108.0, 36.0);
-    let (id_rect, response) = ui.allocate_exact_size(size, Sense::click());
-    // Hang 1px over the chrome/content join so the selected tab is one plane with the window.
-    let rect = if selected {
-        Rect::from_min_max(id_rect.min, Pos2::new(id_rect.max.x, id_rect.max.y + 1.0))
-    } else {
-        id_rect
-    };
+fn tab_chip(ui: &mut egui::Ui, p: &Palette, selected: bool, tab: Tab) -> bool {
+    let size = Vec2::new(100.0, 32.0);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     let hovered = response.hovered();
     let fill = if selected {
-        p.surface
+        p.accent_soft
     } else if hovered {
         p.surface_2
     } else {
         Color32::TRANSPARENT
     };
-    let rounding = egui::CornerRadius {
-        nw: 8,
-        ne: 8,
-        sw: 0,
-        se: 0,
-    };
     ui.painter()
-        .rect(rect, rounding, fill, Stroke::NONE, egui::StrokeKind::Inside);
-    if selected {
-        let cap = Rect::from_min_max(
-            Pos2::new(rect.left() + 12.0, rect.top() + 4.0),
-            Pos2::new(rect.right() - 12.0, rect.top() + 6.0),
-        );
-        ui.painter().rect_filled(cap, 1.0, p.accent);
-    }
+        .rect(rect, 8.0, fill, Stroke::NONE, egui::StrokeKind::Inside);
+    let label_color = if selected { p.text } else { p.muted };
     ui.painter().text(
-        Pos2::new(rect.left() + 12.0, rect.center().y + 1.0),
+        Pos2::new(rect.left() + 12.0, rect.center().y),
         Align2::LEFT_CENTER,
         tab.label(),
         FontId::proportional(14.0),
-        if selected { p.text } else { p.muted },
+        label_color,
     );
     ui.painter().text(
-        Pos2::new(rect.right() - 7.0, rect.top() + 6.0),
-        Align2::RIGHT_TOP,
+        Pos2::new(rect.right() - 8.0, rect.center().y),
+        Align2::RIGHT_CENTER,
         tab.shortcut(),
-        FontId::proportional(9.5),
+        FontId::proportional(10.0),
         p.muted,
     );
-    (id_rect, response.clicked())
+    response.clicked()
 }
 
 pub fn open_with_row(ui: &mut egui::Ui, app: &mut HelperApp) {
