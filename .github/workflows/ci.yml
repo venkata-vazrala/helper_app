@@ -18,7 +18,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -38,7 +38,7 @@ jobs:
     name: No personal identifiers in tree
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Scan
         run: |
           # Built in pieces so this file does not match the search.
