@@ -18,7 +18,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -38,11 +38,22 @@ jobs:
     name: No personal identifiers in tree
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Scan
         run: |
-          if git grep -I -n -E 'venkatagunasekharv|vgsece@|Venkata Gunasekhar' -- . ':!target' ':!.git'; then
+          # Built in pieces so this file does not match the search.
+          PATTERN="$(printf '%s' 'venkata' 'gunasekharv' '|' 'vgse' 'ce@' '|' 'Venkata' ' Gunasekhar')"
+          set +e
+          HITS="$(git grep -I -n -E "$PATTERN" -- . ':!target' ':!.git')"
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -eq 0 ]; then
+            echo "$HITS"
             echo "Personal identifiers found in the repository." >&2
             exit 1
+          fi
+          if [ "$STATUS" -gt 1 ]; then
+            echo "git grep failed with status $STATUS" >&2
+            exit "$STATUS"
           fi
           echo "Clean."
