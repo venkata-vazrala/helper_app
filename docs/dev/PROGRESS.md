@@ -8,6 +8,10 @@
 - Cards, chrome, accent, app icon
 - `scripts/package.sh` → `dist/Helper.app`
 
+## 0.2.0 productization
+
+Catalog, Helper.zip, import command list, listing cap, About card, ADD_AN_APP.md.
+
 ## This slice (2026-09-10)
 
 | Item | Status |

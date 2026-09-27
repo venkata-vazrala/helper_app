@@ -18,6 +18,8 @@ impl HelperApp {
             self.ui_data_card(ui);
             ui.add_space(12.0);
             self.ui_launchers_card(ui);
+            ui.add_space(12.0);
+            self.ui_about_card(ui);
         });
     }
 
@@ -26,14 +28,28 @@ impl HelperApp {
         let Some(pending) = &self.pending else {
             return;
         };
-        let message = match pending {
-            PendingAction::ImportBundle(_) => {
-                "Import will replace workspace and settings from this JSON file."
+        let (message, extra) = match pending {
+            PendingAction::ImportBundle(bundle) => {
+                let cmds: Vec<String> = bundle
+                    .settings
+                    .launchers
+                    .iter()
+                    .map(|l| format!("{} → {}", l.name, l.command))
+                    .collect();
+                (
+                    "Import will replace workspace and settings. Those launchers will run as programs on this machine:".to_string(),
+                    Some(cmds),
+                )
             }
-            PendingAction::Reload => "Reload from disk and discard in-memory edits?",
+            PendingAction::Reload => ("Reload from disk and discard in-memory edits?".into(), None),
         };
         theme::card(&p).show(ui, |ui| {
             ui.colored_label(p.warn, message);
+            if let Some(cmds) = extra {
+                for line in cmds {
+                    ui.label(RichText::new(line).small().monospace().color(p.muted));
+                }
+            }
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if theme::primary_button(ui, &p, "Confirm").clicked() {
@@ -278,8 +294,46 @@ impl HelperApp {
                 });
 
             ui.add_space(10.0);
+            ui.label(theme::muted(&p, "Add from catalog"));
+            ui.add_space(4.0);
+            let presets = crate::catalog::for_this_platform();
+            let existing: Vec<String> = self
+                .config
+                .launchers
+                .iter()
+                .map(|l| l.name.clone())
+                .collect();
+            let mut add_preset = None;
+            for app in &presets {
+                ui.horizontal(|ui| {
+                    let installed = app.is_installed();
+                    ui.label(RichText::new(&app.name).color(if installed {
+                        p.text
+                    } else {
+                        p.muted
+                    }));
+                    if existing.iter().any(|n| n == &app.name) {
+                        ui.label(theme::muted(&p, "added"));
+                    } else if theme::ghost_button(
+                        ui,
+                        &p,
+                        if installed { "Add" } else { "Add anyway" },
+                    )
+                    .clicked()
+                    {
+                        add_preset = Some(app.clone());
+                    }
+                });
+            }
+            if let Some(app) = add_preset {
+                self.config.launchers.push(app.to_launcher());
+                changed = true;
+                self.status = format!("Added {}.", app.name);
+            }
+
+            ui.add_space(10.0);
             ui.horizontal(|ui| {
-                if theme::primary_button(ui, &p, "Add launcher").clicked() {
+                if theme::primary_button(ui, &p, "Add custom").clicked() {
                     self.config.launchers.push(Launcher {
                         name: "New app".into(),
                         command: String::new(),
@@ -287,6 +341,14 @@ impl HelperApp {
                         is_default: false,
                     });
                     changed = true;
+                }
+                if theme::ghost_button(ui, &p, "Restore missing built-ins").clicked() {
+                    if self.config.ensure_known_launchers() {
+                        changed = true;
+                        self.status = "Restored missing built-in launchers.".into();
+                    } else {
+                        self.status = "All built-ins are already present.".into();
+                    }
                 }
                 if theme::ghost_button(ui, &p, "Reset to defaults").clicked() {
                     self.config.launchers = default_launchers();
@@ -312,5 +374,18 @@ impl HelperApp {
         if changed {
             self.persist_config();
         }
+    }
+
+    fn ui_about_card(&mut self, ui: &mut egui::Ui) {
+        let p = self.palette;
+        theme::card(&p).show(ui, |ui| {
+            ui.label(RichText::new("About").heading().color(p.text));
+            ui.label(format!("Helper {}", env!("CARGO_PKG_VERSION")));
+            ui.label(theme::muted(
+                &p,
+                "Local workspace. MIT license. Data stays in helper.json on this machine.",
+            ));
+            ui.label(RichText::new(bundle_path(&self.app_dir).display().to_string()).monospace());
+        });
     }
 }

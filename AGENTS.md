@@ -24,5 +24,6 @@ Native Rust desktop workspace for pinned files/folders, notes, and copy-ready sn
 - Launchers use `{path}`, `{dir}`, and `{name}` placeholders.
 - User data (pins, notes, snippets, launchers) lives outside the git tree.
 - Prefer small modules: `config`, `store`, `launch`, then one UI module per tab.
-- Track this slice in `docs/PLAN.md`, `docs/CHECKLIST.md`, and `docs/PROGRESS.md`.
+- Add new Open-with apps in `src/catalog.toml`, not new functions in `config.rs`. See `docs/ADD_AN_APP.md`.
+- Internal notes live in `docs/dev/`.
 - `cargo fmt` before finishing a change.

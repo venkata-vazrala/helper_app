@@ -1,6 +1,6 @@
 [package]
 name = "helper"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Local desktop workspace: files, notes, snippets, and configurable open-with launchers"
@@ -18,8 +18,8 @@ opt-level = 3
 [dependencies]
 arboard = "3"
 dirs = "7.0.0"
-eframe = "0.36.2"
-egui = "0.36.2"
+eframe = { version = "0.36.2", default-features = false, features = ["accesskit", "default_fonts", "wgpu", "wayland", "x11"] }
+egui = { version = "0.36.2", default-features = false, features = ["default_fonts"] }
 rfd = "0.17.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"

@@ -64,6 +64,7 @@ pub struct HelperApp {
     pub selected_snippet: Option<String>,
     pub listing: Vec<DirEntryInfo>,
     pub listing_error: Option<String>,
+    pub listing_truncated: bool,
     pub filter: String,
     pub status: String,
     pub note_filter: String,
@@ -105,6 +106,7 @@ impl HelperApp {
             selected_snippet,
             listing: Vec::new(),
             listing_error: None,
+            listing_truncated: false,
             filter: String::new(),
             status: load_warning.unwrap_or_else(|| "Ready.".into()),
             note_filter: String::new(),
@@ -154,8 +156,10 @@ impl HelperApp {
     }
 
     pub fn refresh_listing(&mut self) {
+        const LISTING_CAP: usize = 400;
         self.listing.clear();
         self.listing_error = None;
+        self.listing_truncated = false;
         let Some(path) = self.active_path.clone() else {
             return;
         };
@@ -184,6 +188,10 @@ impl HelperApp {
                         .cmp(&a.is_dir)
                         .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
                 });
+                if rows.len() > LISTING_CAP {
+                    rows.truncate(LISTING_CAP);
+                    self.listing_truncated = true;
+                }
                 self.listing = rows;
             }
             Err(err) => {
@@ -203,7 +211,12 @@ impl HelperApp {
     pub fn open_path_with(&mut self, launcher: &Launcher, path: &Path) {
         match launch::open_with(launcher, path) {
             Ok(()) => self.status = format!("Opened in {}", launcher.name),
-            Err(err) => self.status = format!("Could not open in {}: {err}", launcher.name),
+            Err(err) => {
+                self.status = format!(
+                    "Could not open in {} (`{}`): {err}. Is it installed and on PATH?",
+                    launcher.name, launcher.command
+                );
+            }
         }
     }
 

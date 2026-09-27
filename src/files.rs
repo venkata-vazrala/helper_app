@@ -177,8 +177,8 @@ impl HelperApp {
                 theme::empty_state(
                     ui,
                     &p,
-                    "Nothing selected",
-                    "Pin a file or folder to start this workspace.",
+                    "Pin a folder to start",
+                    "Use Add file or Add folder, then Open with for VS Code, Finder, or any app in Settings.",
                 );
                 return;
             };
@@ -201,6 +201,13 @@ impl HelperApp {
                 if let Some(err) = &self.listing_error {
                     ui.colored_label(p.danger, err);
                     return;
+                }
+
+                if self.listing_truncated {
+                    ui.colored_label(
+                        p.warn,
+                        "This folder is large; showing the first 400 items.",
+                    );
                 }
 
                 ui.horizontal(|ui| {

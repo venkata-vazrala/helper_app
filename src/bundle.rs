@@ -84,9 +84,6 @@ impl HelperBundle {
                 Ok(text) => match Self::parse_json(&text) {
                     Ok(mut bundle) => {
                         bundle.settings.appearance.clamp();
-                        if bundle.settings.ensure_known_launchers() {
-                            let _ = bundle.save(&path);
-                        }
                         (bundle, None)
                     }
                     Err(err) => (

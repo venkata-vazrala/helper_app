@@ -50,21 +50,17 @@ if [[ -f "$ICON_SRC" ]] && command -v sips >/dev/null && command -v iconutil >/d
   rm -rf "$ICONSET"
 fi
 
-cp "$BIN" "$DIST/helper"
-chmod +x "$DIST/helper"
-
-# Drop a convenience launcher next to the .app (no install required).
-cat > "$DIST/Open Helper.command" <<'EOF'
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-open "$DIR/Helper.app"
-EOF
-chmod +x "$DIST/Open Helper.command"
+ZIP="$DIST/Helper.zip"
+rm -f "$ZIP"
+ditto -c -k --keepParent "$APP" "$ZIP"
 
 echo
-echo "Ready to run (no install):"
+echo "Ready to run (unsigned):"
 echo "  open \"$APP\""
-echo "Standalone binary:"
-echo "  \"$DIST/helper\""
+echo "Product zip:"
+echo "  \"$ZIP\""
+ls -lh "$APP" "$ZIP" "$MACOS/Helper"
 echo "Optional install into /Applications:"
 echo "  ./scripts/install.sh"
+echo "Optional signing (needs APPLE_IDENTITY):"
+echo "  ./scripts/sign.sh"

@@ -10,13 +10,13 @@ args = ["{path}"]
 [[launchers]]
 name = "VS Code"
 command = "code"
-args = ["{path}"]
+args = ["--", "{path}"]
 is_default = true
 
 [[launchers]]
 name = "Cursor"
 command = "cursor"
-args = ["{path}"]
+args = ["--", "{path}"]
 
 [[launchers]]
 name = "Antigravity IDE"

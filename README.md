@@ -11,6 +11,10 @@ A native **Rust** desktop workspace: pinned files and folders, notes, copy-ready
 
 Unpinning a path moves it to **Recents**. Reorder with the chevron buttons or `Alt+↑` / `Alt+↓` (`Option` on macOS).
 
+## Add an app
+
+Settings → Launchers → **Add from catalog**, or **Add custom**. See [docs/ADD_AN_APP.md](docs/ADD_AN_APP.md) for placeholders and how to extend the catalog.
+
 ## Supported devices
 
 | Platform | Status | How to run |
@@ -48,7 +52,7 @@ Optional copy into `/Applications`:
 ./scripts/install.sh
 ```
 
-`make app` and `make install` wrap the same scripts. Packaging is Darwin-only.
+That produces `dist/Helper.app` and a smaller `dist/Helper.zip`. `make app` and `make install` wrap the same scripts. Packaging is Darwin-only. Unsigned until you set `APPLE_IDENTITY` and run `./scripts/sign.sh`.
 
 ## Data
 

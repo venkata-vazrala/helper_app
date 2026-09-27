@@ -3,6 +3,7 @@
 pub mod app;
 pub mod atomic;
 pub mod bundle;
+pub mod catalog;
 pub mod clipboard;
 pub mod config;
 pub mod files;

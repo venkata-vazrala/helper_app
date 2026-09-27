@@ -180,13 +180,13 @@ pub fn default_launchers() -> Vec<Launcher> {
         Launcher {
             name: "VS Code".into(),
             command: "code".into(),
-            args: vec!["{path}".into()],
+            args: vec!["--".into(), "{path}".into()],
             is_default: true,
         },
         Launcher {
             name: "Cursor".into(),
             command: "cursor".into(),
-            args: vec!["{path}".into()],
+            args: vec!["--".into(), "{path}".into()],
             is_default: false,
         },
         antigravity_launcher(),
@@ -441,7 +441,7 @@ mod tests {
         let text = toml::to_string_pretty(&cfg).unwrap();
         let parsed: AppConfig = toml::from_str(&text).unwrap();
         assert_eq!(parsed.launchers.len(), cfg.launchers.len());
-        assert_eq!(parsed.launchers[1].args, vec!["{path}"]);
+        assert_eq!(parsed.launchers[1].args, vec!["--", "{path}"]);
         assert_eq!(parsed.appearance.theme, ThemeChoice::Dark);
     }
 

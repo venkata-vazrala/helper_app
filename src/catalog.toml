@@ -1,0 +1,123 @@
+# Built-in Open-with catalog. Add a new app by appending an [[apps]] table.
+# platforms: macos | linux | windows
+# detect: PATH command names, or absolute /Applications paths, or ~/...
+
+[[apps]]
+id = "finder"
+name = "Finder"
+platforms = ["macos"]
+command = "open"
+args = ["{path}"]
+detect = ["/System/Library/CoreServices/Finder.app"]
+
+[[apps]]
+id = "vscode"
+name = "VS Code"
+platforms = ["macos", "linux", "windows"]
+command = "code"
+args = ["--", "{path}"]
+detect = ["code"]
+
+[[apps]]
+id = "cursor"
+name = "Cursor"
+platforms = ["macos", "linux", "windows"]
+command = "cursor"
+args = ["--", "{path}"]
+detect = ["cursor", "/Applications/Cursor.app"]
+
+[[apps]]
+id = "antigravity"
+name = "Antigravity IDE"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "Antigravity IDE", "{path}"]
+detect = ["/Applications/Antigravity IDE.app"]
+
+[[apps]]
+id = "zed"
+name = "Zed"
+platforms = ["macos", "linux"]
+command = "zed"
+args = ["{path}"]
+detect = ["zed", "/Applications/Zed.app"]
+
+[[apps]]
+id = "sublime"
+name = "Sublime Text"
+platforms = ["macos", "linux", "windows"]
+command = "subl"
+args = ["{path}"]
+detect = ["subl", "/Applications/Sublime Text.app"]
+
+[[apps]]
+id = "xcode"
+name = "Xcode"
+platforms = ["macos"]
+command = "xed"
+args = ["{path}"]
+detect = ["xed", "/Applications/Xcode.app"]
+
+[[apps]]
+id = "grok"
+name = "Grok"
+platforms = ["macos", "linux"]
+command = "grok"
+args = ["--cwd", "{dir}"]
+detect = ["grok"]
+
+[[apps]]
+id = "terminal"
+name = "Terminal"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "Terminal", "{dir}"]
+detect = ["/System/Applications/Utilities/Terminal.app", "/Applications/Utilities/Terminal.app"]
+
+[[apps]]
+id = "iterm2"
+name = "iTerm"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "iTerm", "{dir}"]
+detect = ["/Applications/iTerm.app"]
+
+[[apps]]
+id = "ghostty"
+name = "Ghostty"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "Ghostty", "{dir}"]
+detect = ["/Applications/Ghostty.app"]
+
+[[apps]]
+id = "warp"
+name = "Warp"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "Warp", "{dir}"]
+detect = ["/Applications/Warp.app"]
+
+[[apps]]
+id = "github-desktop"
+name = "GitHub Desktop"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "GitHub Desktop", "{dir}"]
+detect = ["/Applications/GitHub Desktop.app"]
+
+[[apps]]
+id = "fork"
+name = "Fork"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "Fork", "{dir}"]
+detect = ["/Applications/Fork.app"]
+
+[[apps]]
+id = "preview"
+name = "Preview"
+platforms = ["macos"]
+command = "open"
+args = ["-a", "Preview", "{path}"]
+detect = ["/System/Applications/Preview.app"]
