@@ -3,6 +3,7 @@
 ## Unreleased
 
 - H-plus brand mark: Dock / window icon (`assets/icon.png`), README logo (`assets/logo.png`)
+- MSRV recorded as 1.95 (eframe). Lockfile refreshed. CI audits crates with RustSec and reads the repo only.
 
 ## 0.2.0
 

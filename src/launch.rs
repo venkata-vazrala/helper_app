@@ -39,6 +39,17 @@ pub fn validate_command(command: &str) -> io::Result<()> {
             "launcher command contains control characters",
         ));
     }
+    // Spawn is argv, not a shell. Reject operators so a pasted one-liner cannot
+    // be mistaken for a shell command, and so a later change cannot interpret it.
+    if command
+        .chars()
+        .any(|c| matches!(c, ';' | '&' | '|' | '`' | '$' | '<' | '>' | '\n' | '\r'))
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "launcher command must be a program name, not a shell expression",
+        ));
+    }
     if command.trim().is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -166,6 +177,14 @@ mod tests {
         assert!(validate_command("").is_err());
         assert!(validate_command("   ").is_err());
         assert!(validate_command("code\n").is_err());
+        assert!(validate_command("code && rm").is_err());
+        assert!(validate_command("echo $HOME").is_err());
         assert!(validate_command("code").is_ok());
+        assert!(
+            validate_command(
+                "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+            )
+            .is_ok()
+        );
     }
 }

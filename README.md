@@ -33,7 +33,7 @@ There is no iOS, Android, or web build.
 
 ## Requirements
 
-- [Rust](https://rustup.rs/) **stable** (see `rust-toolchain.toml`)
+- [Rust](https://rustup.rs/) **stable** (MSRV 1.95; `rust-toolchain.toml` tracks stable)
 - Linux packages for a source build: `libgtk-3-dev` plus the usual xcb / xkb libraries
 
 ## Run from source

@@ -2,7 +2,7 @@
 name = "helper"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.95"
 description = "Local desktop workspace: files, notes, snippets, and configurable open-with launchers"
 license = "MIT"
 readme = "README.md"
@@ -23,8 +23,8 @@ egui = { version = "0.36.2", default-features = false, features = ["default_font
 rfd = "0.17.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-toml = "1.1.5"
-uuid = { version = "1.26.1", features = ["v4", "serde"] }
+toml = "1.1.6"
+uuid = { version = "1.27.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 tempfile = "3"
