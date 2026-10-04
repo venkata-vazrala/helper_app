@@ -26,4 +26,5 @@ Native Rust desktop workspace for pinned files/folders, notes, and copy-ready sn
 - Prefer small modules: `config`, `store`, `launch`, then one UI module per tab.
 - Add new Open-with apps in `src/catalog.toml`, not new functions in `config.rs`. See `docs/ADD_AN_APP.md`.
 - Internal notes live in `docs/dev/`.
+- Brand: `assets/icon.png` (1024 square Dock/window icon), `assets/logo.png` (squircle for README), `assets/wordmark.svg`.
 - `cargo fmt` before finishing a change.

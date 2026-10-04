@@ -379,8 +379,15 @@ impl HelperApp {
     fn ui_about_card(&mut self, ui: &mut egui::Ui) {
         let p = self.palette;
         theme::card(&p).show(ui, |ui| {
-            ui.label(RichText::new("About").heading().color(p.text));
-            ui.label(format!("Helper {}", env!("CARGO_PKG_VERSION")));
+            ui.horizontal(|ui| {
+                crate::app::chrome_mark(ui, self.icon_tex.as_ref(), &p, 48.0);
+                ui.add_space(8.0);
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("About").heading().color(p.text));
+                    ui.label(format!("Helper {}", env!("CARGO_PKG_VERSION")));
+                });
+            });
+            ui.add_space(6.0);
             ui.label(theme::muted(
                 &p,
                 "Local workspace. MIT license. Data stays in helper.json on this machine.",

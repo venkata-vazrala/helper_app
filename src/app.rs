@@ -75,6 +75,7 @@ pub struct HelperApp {
     last_style: Option<(egui::Theme, Appearance)>,
     /// When helper.json could not be parsed, never overwrite it until import/reload succeeds.
     suppress_save: bool,
+    pub(crate) icon_tex: Option<egui::TextureHandle>,
 }
 
 impl HelperApp {
@@ -116,6 +117,7 @@ impl HelperApp {
             pending: None,
             last_style: None,
             suppress_save,
+            icon_tex: load_brand_icon(&cc.egui_ctx),
         };
         app.refresh_listing();
         app
@@ -421,15 +423,7 @@ impl eframe::App for HelperApp {
             .show_separator_line(false)
             .show(ui, |ui| {
                 ui.horizontal_centered(|ui| {
-                    let (mark, _) = ui.allocate_exact_size(Vec2::splat(26.0), egui::Sense::hover());
-                    ui.painter().rect_filled(mark, 6.0, p.accent);
-                    ui.painter().text(
-                        mark.center(),
-                        Align2::CENTER_CENTER,
-                        "H",
-                        FontId::proportional(14.0),
-                        p.on_accent,
-                    );
+                    chrome_mark(ui, self.icon_tex.as_ref(), &p, 28.0);
                     ui.add_space(8.0);
                     ui.label(RichText::new("Helper").size(16.0).strong().color(p.text));
                     ui.add_space(22.0);
@@ -490,6 +484,66 @@ fn resolve_theme(ctx: &egui::Context, choice: ThemeChoice) -> egui::Theme {
         ThemeChoice::Light => egui::Theme::Light,
         ThemeChoice::System => ctx.system_theme().unwrap_or(egui::Theme::Dark),
     }
+}
+
+fn load_brand_icon(ctx: &egui::Context) -> Option<egui::TextureHandle> {
+    let data = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png")).ok()?;
+    let size = [data.width as usize, data.height as usize];
+    let image = egui::ColorImage::from_rgba_unmultiplied(size, &data.rgba);
+    Some(ctx.load_texture("helper-icon", image, egui::TextureOptions::LINEAR))
+}
+
+pub(crate) fn chrome_mark(
+    ui: &mut egui::Ui,
+    tex: Option<&egui::TextureHandle>,
+    p: &Palette,
+    side: f32,
+) {
+    if let Some(tex) = tex {
+        ui.add(
+            egui::Image::from_texture(tex)
+                .fit_to_exact_size(Vec2::splat(side))
+                .corner_radius(side * 0.25)
+                .alt_text("Helper"),
+        );
+        return;
+    }
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(side), Sense::hover());
+    let s = side / 28.0;
+    ui.painter()
+        .rect_filled(rect, side * 0.25, Color32::from_rgb(42, 48, 54));
+    let bars = Color32::from_rgb(197, 232, 224);
+    let plus = p.accent;
+    let bar_w = 4.0 * s;
+    let pad = 6.0 * s;
+    ui.painter().rect_filled(
+        egui::Rect::from_min_max(
+            Pos2::new(rect.left() + pad, rect.top() + pad),
+            Pos2::new(rect.left() + pad + bar_w, rect.bottom() - pad),
+        ),
+        2.0 * s,
+        bars,
+    );
+    ui.painter().rect_filled(
+        egui::Rect::from_min_max(
+            Pos2::new(rect.right() - pad - bar_w, rect.top() + pad),
+            Pos2::new(rect.right() - pad, rect.bottom() - pad),
+        ),
+        2.0 * s,
+        bars,
+    );
+    let plus_w = 10.0 * s;
+    let plus_t = 4.0 * s;
+    ui.painter().rect_filled(
+        egui::Rect::from_center_size(rect.center(), Vec2::new(plus_w, plus_t)),
+        1.5 * s,
+        plus,
+    );
+    ui.painter().rect_filled(
+        egui::Rect::from_center_size(rect.center(), Vec2::new(plus_t, plus_w)),
+        1.5 * s,
+        plus,
+    );
 }
 
 fn tab_chip(ui: &mut egui::Ui, p: &Palette, selected: bool, tab: Tab) -> bool {

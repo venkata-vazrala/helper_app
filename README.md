@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" width="144" alt="Helper">
+</p>
+
 # Helper
 
 A native **Rust** desktop workspace: pinned files and folders, notes, copy-ready snippets, and configurable **Open with** apps. Data stays on your machine.

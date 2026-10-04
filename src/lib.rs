@@ -37,3 +37,22 @@ pub fn run() -> eframe::Result<()> {
         Box::new(|cc| Ok(Box::new(app::HelperApp::new(cc)))),
     )
 }
+
+#[cfg(test)]
+mod brand_tests {
+    #[test]
+    fn icon_png_is_1024_square() {
+        let data = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png"))
+            .expect("assets/icon.png should decode");
+        assert_eq!((data.width, data.height), (1024, 1024));
+        assert_eq!(data.rgba.len(), 1024 * 1024 * 4);
+    }
+
+    #[test]
+    fn logo_png_is_1024_square() {
+        let data = eframe::icon_data::from_png_bytes(include_bytes!("../assets/logo.png"))
+            .expect("assets/logo.png should decode");
+        assert_eq!((data.width, data.height), (1024, 1024));
+        assert_eq!(data.rgba.len(), 1024 * 1024 * 4);
+    }
+}

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- H-plus brand mark: Dock / window icon (`assets/icon.png`), README logo (`assets/logo.png`)
+
 ## 0.2.0
 
 - App catalog in Settings (Add / Add anyway) plus Add custom
